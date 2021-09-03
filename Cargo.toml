@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "visioncortex",
+    "webapp"
+]

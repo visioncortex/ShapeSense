@@ -1,0 +1,13 @@
+{
+"compilerOptions": {
+  "module": "ES6",
+  "noImplicitAny": true,
+  "removeComments": true,
+  "preserveConstEnums": true,
+  "outDir": "./js_out",
+  "moduleResolution": "node",
+  "sourceMap": true
+},
+"include": ["./src/*"],
+"exclude": ["node_modules", "**/*.spec.ts"]
+}

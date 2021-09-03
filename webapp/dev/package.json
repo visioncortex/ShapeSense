@@ -1,0 +1,22 @@
+{
+  "name": "image-repair-webapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsc-watch --onFirstSuccess webpack-dev-server",
+    "build": "webpack"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "image-repair": "file:../pkg",
+    "typescript": "^4.2.3",
+    "webpack": "^4.41.5"
+  },
+  "devDependencies": {
+    "tsc-watch": "^4.5.0",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.1"
+  }
+}
