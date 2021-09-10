@@ -1,5 +1,7 @@
 use wasm_bindgen::prelude::*;
 
+pub mod canvas;
+pub mod common;
 pub mod image_repair;
 pub mod util;
 
