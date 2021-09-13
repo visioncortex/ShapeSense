@@ -1,4 +1,4 @@
-use visioncortex::{Color, PathI32, PointI32};
+use visioncortex::{Color, PathF64, PathI32, PointF64, PointI32};
 use web_sys::CanvasRenderingContext2d;
 
 use crate::canvas::Canvas;
@@ -38,5 +38,27 @@ impl DrawUtil {
             ctx.line_to(point.x as f64, point.y as f64);
             ctx.stroke();
         });
+    }
+
+    pub fn draw_path_f64(&self, color: &Color, path: &PathF64) {
+        let ctx = self.ctx();
+        ctx.set_stroke_style(&color.to_hex_string().into());
+
+        ctx.begin_path();
+        ctx.move_to(path[0].x, path[0].y);
+        path.path.iter().for_each(|&point| {
+            ctx.line_to(point.x, point.y);
+            ctx.stroke();
+        });
+    }
+
+    pub fn draw_line_f64(&self, color: &Color, from: PointF64, to: PointF64) {
+        let ctx = self.ctx();
+        ctx.set_stroke_style(&color.to_hex_string().into());
+
+        ctx.begin_path();
+        ctx.move_to(from.x, from.y);
+        ctx.line_to(to.x, to.y);
+        ctx.stroke();
     }
 }

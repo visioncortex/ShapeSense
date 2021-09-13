@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
+use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
 use crate::util::console_log_util;
@@ -69,9 +69,58 @@ impl Repairer {
         let midpoint: usize = endpoints.iter().sum::<usize>() >> 1;
         let tail = std::cmp::max(endpoints[0], endpoints[1]);
 
+        let color1 = Color::get_palette_color(1);
+        let color2 = Color::get_palette_color(3);
+
         let (curve1, curve2) = Self::split_path(path, head, midpoint, tail);
-        self.draw_util.draw_path_i32(&Color::get_palette_color(1), &curve1);
-        self.draw_util.draw_path_i32(&Color::get_palette_color(3), &curve2);
+        // self.draw_util.draw_path_i32(&color1, &curve1);
+        // self.draw_util.draw_path_i32(&color2, &curve2);
+
+        let tolerance = 0.7;
+        let mut simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
+        let mut simplified_curve2 = PathI32::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
+
+        // Close the path for smooth function
+        simplified_curve1.add(simplified_curve1[0]);
+        simplified_curve2.add(simplified_curve2[0]);
+
+        // self.draw_util.draw_path_i32(&color1, &simplified_curve1);
+        // self.draw_util.draw_path_i32(&color2, &simplified_curve2);
+
+        // console_log_util(format!("{:?}", simplified_curve1));
+        // console_log_util(format!("{:?}", simplified_curve2));
+
+        let corner_threshold = std::f64::consts::FRAC_PI_2;
+        let outset_ratio = 20.0;
+        let segment_length = 0.33;
+        let max_iterations = 5;
+
+        let mut smooth_curve1 = simplified_curve1.smooth(corner_threshold, outset_ratio, segment_length, max_iterations);
+        let mut smooth_curve2 = simplified_curve2.smooth(corner_threshold, outset_ratio, segment_length, max_iterations);
+
+        // Remove the last point to make them open curves
+        smooth_curve1.pop();
+        smooth_curve2.pop();
+
+        // self.draw_util.draw_path_f64(&color1, &smooth_curve1);
+        // self.draw_util.draw_path_f64(&color2, &smooth_curve2);
+
+        // console_log_util(format!("{} {}", simplified_curve1.len(), smooth_curve1.len()));
+        // console_log_util(format!("{} {}", simplified_curve2.len(), smooth_curve2.len()));
+
+        // console_log_util(format!("{:?}", &smooth_curve1[(smooth_curve1.len()-5)..]));
+        // console_log_util(format!("{:?}", &smooth_curve2[(smooth_curve2.len()-5)..]));
+
+        let tail_gradient_n = 5;
+        let weight_decay_factor = 0.5;
+        let tail_grad1 = Self::calculate_weighted_average_gradient_at_tail(&smooth_curve1, tail_gradient_n, weight_decay_factor);
+        let tail_grad2 = Self::calculate_weighted_average_gradient_at_tail(&smooth_curve2, tail_gradient_n, weight_decay_factor);
+
+        let endpoint1 = path[head].to_point_f64();
+        let endpoint2 = path[tail].to_point_f64();
+        let visual_length = 10.0;
+        self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_grad1*visual_length);
+        self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_grad2*visual_length);
     }
 }
 
@@ -142,5 +191,45 @@ impl Repairer {
         let mid_to_tail = PathI32::from_points(path[mid..=tail].to_vec());
 
         (mid_to_head, mid_to_tail)
+    }
+
+    /// Calculate the weighted average gradient at the tail of 'path'.
+    /// The last 'n' points are taken into account.
+    /// The gradients closer to the tail receive higher weightings.
+    /// A smaller 'weight_decay_factor' indicates a faster decay *farther* away from the tail.
+    /// The behavior is undefined unless path is open and 1 < n <= path.len().
+    fn calculate_weighted_average_gradient_at_tail(path: &PathF64, n: usize, weight_decay_factor: f64) -> PointF64 {
+        let len = path.len();
+        assert!(1 < n);
+        assert!(n <= len);
+
+        let mut grad_acc = PointF64::default();
+        let mut from = path[len-n];
+        for i in (len-n+1)..len {
+            let to = path[i];
+            grad_acc = (grad_acc + (to - from).get_normalized()) * weight_decay_factor;
+            from = to;
+        }
+
+        grad_acc.get_normalized()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn point_f64_approx(a: PointF64, b: PointF64) -> bool {
+        (a-b).norm() < 1e-5
+    }
+
+    #[test]
+    fn tail_gradient() {
+        let mut path = PathF64::new();
+        path.add(PointF64::new(0.5, 0.0));
+        path.add(PointF64::new(1.0, 2.0));
+        path.add(PointF64::new(2.0, 4.0));
+        assert!(point_f64_approx(PointF64::new(1.0, 2.0).get_normalized(), Repairer::calculate_weighted_average_gradient_at_tail(&path, 2, 0.5)));
+        assert!(point_f64_approx(PointF64::new(0.3810091792, 0.9245712548), Repairer::calculate_weighted_average_gradient_at_tail(&path, 3, 0.5)));
     }
 }
