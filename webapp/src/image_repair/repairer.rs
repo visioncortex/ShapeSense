@@ -111,16 +111,22 @@ impl Repairer {
         // console_log_util(format!("{:?}", &smooth_curve1[(smooth_curve1.len()-5)..]));
         // console_log_util(format!("{:?}", &smooth_curve2[(smooth_curve2.len()-5)..]));
 
-        let tail_gradient_n = 5;
+        let tail_gradient_n = 10;
         let weight_decay_factor = 0.5;
-        let tail_grad1 = Self::calculate_weighted_average_gradient_at_tail(&smooth_curve1, tail_gradient_n, weight_decay_factor);
-        let tail_grad2 = Self::calculate_weighted_average_gradient_at_tail(&smooth_curve2, tail_gradient_n, weight_decay_factor);
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve1, tail_gradient_n, weight_decay_factor);
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve2, tail_gradient_n, weight_decay_factor);
 
         let endpoint1 = path[head].to_point_f64();
         let endpoint2 = path[tail].to_point_f64();
-        let visual_length = 10.0;
-        self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_grad1*visual_length);
-        self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_grad2*visual_length);
+        // let visual_length = 10.0;
+        // self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*visual_length);
+        // self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*visual_length);
+
+        let smoothness = 300;
+        let interpolated_curve = Self::interpolate_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
+        self.draw_util.draw_path_f64(&Color::get_palette_color(4), &interpolated_curve);
+
+        console_log_util(format!("{:?}", interpolated_curve));
     }
 }
 
@@ -193,25 +199,81 @@ impl Repairer {
         (mid_to_head, mid_to_tail)
     }
 
-    /// Calculate the weighted average gradient at the tail of 'path'.
+    /// Calculate the weighted average tangent vector at the tail of 'path'.
     /// The last 'n' points are taken into account.
-    /// The gradients closer to the tail receive higher weightings.
+    /// The tangents closer to the tail receive higher weightings.
     /// A smaller 'weight_decay_factor' indicates a faster decay *farther* away from the tail.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
-    fn calculate_weighted_average_gradient_at_tail(path: &PathF64, n: usize, weight_decay_factor: f64) -> PointF64 {
+    fn calculate_weighted_average_tangent_at_tail(path: &PathF64, n: usize, weight_decay_factor: f64) -> PointF64 {
         let len = path.len();
         assert!(1 < n);
         assert!(n <= len);
 
-        let mut grad_acc = PointF64::default();
+        let mut tangent_acc = PointF64::default();
         let mut from = path[len-n];
         for i in (len-n+1)..len {
             let to = path[i];
-            grad_acc = (grad_acc + (to - from).get_normalized()) * weight_decay_factor;
+            tangent_acc = (tangent_acc + (to - from).get_normalized()) * weight_decay_factor;
             from = to;
         }
 
-        grad_acc.get_normalized()
+        tangent_acc.get_normalized()
+    }
+
+    /// Interpolate the curve from 'from_point' to 'to_point' with the provided tangents.
+    /// 'smoothness' is an unbounded parameter that governs the smoothness of the interpolated curve.
+    /// The behavior is undefined unless 0 < smoothness.
+    fn interpolate_curve(from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
+        let find_mid_point = |p1: &PointF64, p2: &PointF64| {
+            let x = (p1.x + p2.x) / 2.0;
+            let y = (p1.y + p2.y) / 2.0;
+            PointF64::new(x, y)
+        };
+
+        // Given lines p1p2 and p3p4, returns their intersection.
+        // If the two lines coincide, returns the mid-pt of p2 and p3.
+        // If the two lines are parallel, panicks.
+        // https://github.com/tyt2y3/vaser-unity/blob/master/Assets/Vaser/Vec2Ext.cs#L107 (Intersect)
+        let find_intersection = |p1: &PointF64, p2: &PointF64, p3: &PointF64, p4: &PointF64| {
+
+            const EPSILON: f64 = 1e-7;
+            
+            let (denom, numera, numerb);
+            denom  = (p4.y-p3.y) * (p2.x-p1.x) - (p4.x-p3.x) * (p2.y-p1.y);
+            numera = (p4.x-p3.x) * (p1.y-p3.y) - (p4.y-p3.y) * (p1.x-p3.x);
+            numerb = (p2.x-p1.x) * (p1.y-p3.y) - (p2.y-p1.y) * (p1.x-p3.x);
+
+            if denom <= EPSILON && numera <= EPSILON && numerb <= EPSILON {
+                // The two lines coincide
+                return find_mid_point(p2, p3);
+            }
+
+            if denom <= EPSILON {
+                panic!("The two lines are parallel!");
+            }
+
+            let mua = numera/denom;
+
+            PointF64::new(p1.x + mua * (p2.x-p1.x), p1.y + mua * (p2.y-p1.y))
+        };
+
+        let intersection = find_intersection(&from_point, &(from_point+from_tangent), &to_point, &(to_point+to_tangent));
+
+        // Find the quadratic Bezier curve
+        let mut interpolated_curve = PathF64::new();
+        let mut t = 0.0;
+        let delta = 1.0 / smoothness as f64;
+        let p0 = from_point;
+        let p1 = intersection;
+        let p2 = to_point;
+        while t <= 1.0 {
+            let t_inv = 1.0 - t;
+            interpolated_curve.add((p0*t_inv + p1*t) * t_inv + (p1*t_inv + p2*t) * t);
+            t += delta;
+        }
+        interpolated_curve.add(to_point);
+
+        interpolated_curve
     }
 }
 
@@ -229,7 +291,7 @@ mod tests {
         path.add(PointF64::new(0.5, 0.0));
         path.add(PointF64::new(1.0, 2.0));
         path.add(PointF64::new(2.0, 4.0));
-        assert!(point_f64_approx(PointF64::new(1.0, 2.0).get_normalized(), Repairer::calculate_weighted_average_gradient_at_tail(&path, 2, 0.5)));
-        assert!(point_f64_approx(PointF64::new(0.3810091792, 0.9245712548), Repairer::calculate_weighted_average_gradient_at_tail(&path, 3, 0.5)));
+        assert!(point_f64_approx(PointF64::new(1.0, 2.0).get_normalized(), Repairer::calculate_weighted_average_tangent_at_tail(&path, 2, 0.5)));
+        assert!(point_f64_approx(PointF64::new(0.3810091792, 0.9245712548), Repairer::calculate_weighted_average_tangent_at_tail(&path, 3, 0.5)));
     }
 }
