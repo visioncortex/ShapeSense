@@ -2,7 +2,7 @@ use num_traits::Float;
 use std::{fmt::Display, ops::*};
 
 /// Generic point in 2D space
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Point2<T> {
     pub x: T,
     pub y: T,
@@ -40,6 +40,16 @@ where
 
 impl<T> Point2<T>
 where
+    T: Add<Output = T>
+{
+    #[inline]
+    pub fn translate(self, vector: Self) -> Self {
+        self + vector
+    }
+}
+
+impl<T> Point2<T>
+where
     T: Float,
 {
     #[inline]
@@ -50,11 +60,6 @@ where
             x: a.cos() * (self.x - o.x) - a.sin() * (self.y - o.y) + o.x,
             y: a.sin() * (self.x - o.x) + a.cos() * (self.y - o.y) + o.y,
         }
-    }
-
-    #[inline]
-    pub fn translate(self, vector: Self) -> Self {
-        self + vector
     }
 
     #[inline]

@@ -189,6 +189,14 @@ impl BoundingRect {
         self.right += p.x;
         self.bottom += p.y;
     }
+
+    pub fn have_point_on_boundary(&self, p: PointI32) -> bool {
+        // On left or right bounds
+        (p.x == self.left || p.x == self.right) && (self.top <= p.y && p.y <= self.bottom)
+            ||
+        // On top or bottom bounds
+        (p.y == self.top || p.y == self.bottom) && (self.left <= p.x && p.x <= self.right)
+    }
 }
 
 impl Bound for BoundingRect {
@@ -372,5 +380,29 @@ mod tests {
             merge_expand(vec![a, b], 0, 1),
             [[b],[a]]
         );
+    }
+
+    #[test]
+    fn point_on_boundary() {
+        // GIVEN a generic bounding rect and its corners
+        let rect = BoundingRect::new_x_y_w_h(0, 0, 5, 6);
+        let top_left = PointI32::new(rect.left, rect.top);
+        let top_right = PointI32::new(rect.right, rect.top);
+        let bottom_left = PointI32::new(rect.left, rect.bottom);
+        let bottom_right = PointI32::new(rect.right, rect.bottom);
+
+        // THEN its corners are on its boundary
+        assert!(rect.have_point_on_boundary(top_left));
+        assert!(rect.have_point_on_boundary(top_right));
+        assert!(rect.have_point_on_boundary(bottom_left));
+        assert!(rect.have_point_on_boundary(bottom_right));
+
+        // THEN points inside are not on its boundary
+        assert!(!rect.have_point_on_boundary(top_left.translate(PointI32::new(1, 1))));
+        assert!(!rect.have_point_on_boundary(top_right.translate(PointI32::new(-1, 1))));
+
+        // THEN points outside are not on its boundary
+        assert!(!rect.have_point_on_boundary(bottom_left.translate(PointI32::new(-1, 1))));
+        assert!(!rect.have_point_on_boundary(bottom_right.translate(PointI32::new(-1, -1))));
     }
 }

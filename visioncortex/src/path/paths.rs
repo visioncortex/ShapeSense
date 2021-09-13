@@ -1,10 +1,10 @@
 use std::fmt::Write;
-use std::ops::{Add, AddAssign, Sub, Mul};
+use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Range, RangeInclusive, Sub};
 
 use crate::{BinaryImage, Point2, PointF64, PointI32, Shape, ToSvgString};
 use super::{PathSimplify, PathSimplifyMode, PathWalker, smooth::SubdivideSmooth, reduce::reduce};
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 /// Path of generic points in 2D space
 pub struct Path<T> {
     /// T can be PointI32/PointF64, etc. (see src/point.rs).
@@ -22,6 +22,13 @@ impl<T> Path<T>
     pub fn new() -> Self {
         Self {
             path: vec![]
+        }
+    }
+
+    /// Creates a 2D Path with 'points' as its points
+    pub fn from_points(points: Vec<T>) -> Self {
+        Self {
+            path: points
         }
     }
 
@@ -43,6 +50,40 @@ impl<T> Path<T>
     /// Returns true if the path is empty, false otherwise
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+impl<T> Index<usize> for Path<T>
+{
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.path[index]
+    }
+}
+
+impl<T> IndexMut<usize> for Path<T>
+{
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.path[index]
+    }
+}
+
+impl<T> Index<Range<usize>> for Path<T>
+{
+    type Output = [T];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        &self.path[index]
+    }
+}
+
+impl<T> Index<RangeInclusive<usize>> for Path<T>
+{
+    type Output = [T];
+
+    fn index(&self, index: RangeInclusive<usize>) -> &Self::Output {
+        &self.path[index]
     }
 }
 
