@@ -1,5 +1,5 @@
 use std::fmt::Write;
-use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Range, RangeInclusive, Sub};
+use std::ops::{Add, AddAssign, Index, IndexMut, Mul, Range, RangeFrom, RangeInclusive, Sub};
 
 use crate::{BinaryImage, Point2, PointF64, PointI32, Shape, ToSvgString};
 use super::{PathSimplify, PathSimplifyMode, PathWalker, smooth::SubdivideSmooth, reduce::reduce};
@@ -35,6 +35,11 @@ impl<T> Path<T>
     /// Adds a point to the end of the path
     pub fn add(&mut self, point: T) {
         self.path.push(point);
+    }
+
+    /// Removes the last point from the path and returns it, or None if it is empty.
+    pub fn pop(&mut self) -> Option<T> {
+        self.path.pop()
     }
 
     /// Returns an iterator on the vector of points in the path
@@ -83,6 +88,15 @@ impl<T> Index<RangeInclusive<usize>> for Path<T>
     type Output = [T];
 
     fn index(&self, index: RangeInclusive<usize>) -> &Self::Output {
+        &self.path[index]
+    }
+}
+
+impl<T> Index<RangeFrom<usize>> for Path<T>
+{
+    type Output = [T];
+
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
         &self.path[index]
     }
 }

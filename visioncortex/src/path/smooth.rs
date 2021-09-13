@@ -199,7 +199,7 @@ impl SubdivideSmooth {
         // Close path
         new_path.push(new_path[0]);
 
-        (PathF64 { path: new_path }, new_corners, can_terminate_iteration)
+        (PathF64::from_points(new_path), new_corners, can_terminate_iteration)
     }
 
     /// Finds mid-points between (p_i and p_j) and (p_1 and p_2),

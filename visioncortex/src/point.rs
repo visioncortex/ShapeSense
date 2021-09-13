@@ -50,7 +50,7 @@ where
 
 impl<T> Point2<T>
 where
-    T: Float,
+    T: Default + Float,
 {
     #[inline]
     pub fn rotate(&self, origin: Self, angle: T) -> Self {
@@ -65,6 +65,16 @@ where
     #[inline]
     pub fn norm(self) -> T {
         self.dot(self).sqrt()
+    }
+
+    #[inline]
+    pub fn get_normalized(&self) -> Self {
+        let norm = self.norm();
+        if norm != T::zero() {
+            *self / norm
+        } else {
+            Self::default()
+        }
     }
 }
 
@@ -128,6 +138,60 @@ where
     fn sub_assign(&mut self, other: Self) {
         self.x.sub_assign(other.x);
         self.y.sub_assign(other.y);
+    }
+}
+
+impl<T, F> Mul<F> for Point2<T>
+where
+    T: Mul<F, Output = T>,
+    F: Float,
+{
+    type Output = Self;
+
+    fn mul(self, rhs: F) -> Self::Output {
+        Self {
+            x: self.x.mul(rhs),
+            y: self.y.mul(rhs),
+        }
+    }
+}
+
+impl<T, F> MulAssign<F> for Point2<T>
+where
+    T: MulAssign<F>,
+    F: Float,
+{
+    fn mul_assign(&mut self, rhs: F) {
+        self.x.mul_assign(rhs);
+        self.y.mul_assign(rhs);
+    }
+}
+
+impl<T, F> Div<F> for Point2<T>
+where
+    T: Div<F, Output = T>,
+    F: Float,
+{
+    type Output = Self;
+
+    #[inline]
+    fn div(self, rhs: F) -> Self::Output {
+        Self {
+            x: self.x.div(rhs),
+            y: self.y.div(rhs),
+        }
+    }
+}
+
+impl<T, F> DivAssign<F> for Point2<T>
+where
+    T: DivAssign<F>,
+    F: Float,
+{
+    #[inline]
+    fn div_assign(&mut self, rhs: F) {
+        self.x.div_assign(rhs);
+        self.y.div_assign(rhs);
     }
 }
 
