@@ -61,4 +61,18 @@ impl DrawUtil {
         ctx.line_to(to.x, to.y);
         ctx.stroke();
     }
+
+    pub fn draw_cubic_bezier_curve(&self, color: &Color, control_points: [PointF64; 4]) {
+        let ctx = self.ctx();
+        ctx.set_stroke_style(&color.to_hex_string().into());
+
+        ctx.begin_path();
+        ctx.move_to(control_points[0].x, control_points[0].y);
+        ctx.bezier_curve_to(
+            control_points[1].x, control_points[1].y,
+            control_points[2].x, control_points[2].y,
+            control_points[3].x, control_points[3].y,
+        );
+        ctx.stroke();
+    }
 }

@@ -1,5 +1,6 @@
+use flo_curves::{Coordinate, Coordinate2D};
 use num_traits::Float;
-use std::{fmt::Display, ops::*};
+use std::{cmp::PartialOrd, convert::{From, Into}, fmt::Display, ops::*};
 
 /// Generic point in 2D space
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -192,6 +193,62 @@ where
     fn div_assign(&mut self, rhs: F) {
         self.x.div_assign(rhs);
         self.y.div_assign(rhs);
+    }
+}
+
+impl<F> Coordinate2D for Point2<F>
+where
+    F: Copy + Into<f64>,
+{
+    fn x(&self) -> f64 {
+        self.x.into()
+    }
+
+    fn y(&self) -> f64 {
+        self.y.into()
+    }
+}
+
+impl<F> Coordinate for Point2<F>
+where
+    F: Add<Output = F> + Copy + Default + Float + From<f64> + Into<f64> + Mul<f64, Output = F> + PartialEq + Sub<Output = F>,
+{
+    #[inline]
+    fn from_components(components: &[f64]) -> Self {
+        Self::new(components[0].into(), components[1].into())
+    }
+
+    #[inline]
+    fn origin() -> Self {
+        Self::default()
+    }
+
+    #[inline]
+    fn len() -> usize {
+        2
+    }
+
+    #[inline]
+    fn get(&self, index: usize) -> f64 {
+        match index {
+            0 => self.x.into(),
+            1 => self.y.into(),
+            _ => panic!("Point2 only has two components")
+        }
+    }
+
+    fn from_biggest_components(p1: Self, p2: Self) -> Self {
+        Self::new(
+            f64::from_biggest_components(p1.x.into(), p2.x.into()).into(),
+            f64::from_biggest_components(p1.y.into(), p2.y.into()).into(),
+        )
+    }
+
+    fn from_smallest_components(p1: Self, p2: Self) -> Self {
+        Self::new(
+            f64::from_smallest_components(p1.x.into(), p2.x.into()).into(),
+            f64::from_smallest_components(p1.y.into(), p2.y.into()).into(),
+        )
     }
 }
 

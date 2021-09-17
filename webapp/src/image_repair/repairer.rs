@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use bit_vec::BitVec;
+use flo_curves::{BezierCurve, BezierCurveFactory, bezier::{self, Curve}};
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
@@ -63,18 +65,20 @@ impl Repairer {
 
         // Assume only 1 path with 2 endpoints
         assert!(paths_with_two_endpoints.len() == 1);
-        let (path, endpoints) = &paths_with_two_endpoints[0];
+        let (path, endpoints) = paths_with_two_endpoints[0].clone();
 
-        let head = std::cmp::min(endpoints[0], endpoints[1]);
-        let midpoint: usize = endpoints.iter().sum::<usize>() >> 1;
-        let tail = std::cmp::max(endpoints[0], endpoints[1]);
+        let tail1 = endpoints[0];
+        let tail2 = endpoints[1];
+
+        let endpoint1 = path[tail1].to_point_f64();
+        let endpoint2 = path[tail2].to_point_f64();
 
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
-        let (curve1, curve2) = Self::split_path(path, head, midpoint, tail);
-        // self.draw_util.draw_path_i32(&color1, &curve1);
-        // self.draw_util.draw_path_i32(&color2, &curve2);
+        let (curve1, curve2) = self.split_path(path, tail1, tail2);
+        self.draw_util.draw_path_i32(&color1, &curve1);
+        self.draw_util.draw_path_i32(&color2, &curve2);
 
         let tolerance = 0.7;
         let mut simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
@@ -111,22 +115,28 @@ impl Repairer {
         // console_log_util(format!("{:?}", &smooth_curve1[(smooth_curve1.len()-5)..]));
         // console_log_util(format!("{:?}", &smooth_curve2[(smooth_curve2.len()-5)..]));
 
-        let tail_gradient_n = 10;
+        let tail_tangent_n = 10;
         let weight_decay_factor = 0.5;
-        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve1, tail_gradient_n, weight_decay_factor);
-        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve2, tail_gradient_n, weight_decay_factor);
-
-        let endpoint1 = path[head].to_point_f64();
-        let endpoint2 = path[tail].to_point_f64();
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve1, tail_tangent_n, weight_decay_factor);
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve2, tail_tangent_n, weight_decay_factor);
         // let visual_length = 10.0;
         // self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*visual_length);
         // self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*visual_length);
+        
+        let smoothness = 100;
 
-        let smoothness = 300;
-        let interpolated_curve = Self::interpolate_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
-        self.draw_util.draw_path_f64(&Color::get_palette_color(4), &interpolated_curve);
+        let quadratic_curve = self.calculate_quadratic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
+        self.draw_util.draw_path_f64(&Color::get_palette_color(6), &quadratic_curve);
 
-        console_log_util(format!("{:?}", interpolated_curve));
+        let cubic_curve = self.calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2);
+        let points: Vec<PointF64> = (0..smoothness)
+            .into_iter()
+            .map(|i| {
+                let t = i as f64 / smoothness as f64;
+                cubic_curve.point_at_pos(t)
+            })
+            .collect();
+        self.draw_util.draw_path_f64(&Color::get_palette_color(4), &PathF64::from_points(points));
     }
 }
 
@@ -167,36 +177,90 @@ impl Repairer {
 
     /// Currently naive approach of checking whether points in the path are on the boundary of hole_rect.
     /// Return indices of points on 'path' that are on said boundary.
+    /// The behavior is undefined unless 'path' is closed.
     fn find_endpoints_on_path(&self, path: &PathI32) -> Vec<usize> {
-        let mut points = HashMap::new();
+        assert_eq!(path[0], path[path.len()-1]);
+        // The last point is not considered because it is the same as the first in a closed path
+        let is_endpoint_mask = BitVec::from_fn(path.len()-1, |i| {
+            self.hole_rect.have_point_on_boundary(path[i])
+        });
 
-        path.path
-            .iter()
-            .enumerate()
-            .for_each(|(i, &point)| {
-                if self.hole_rect.have_point_on_boundary(point) {
-                    points.insert(point, i);
-                }
-            });
-
-        points.into_values().collect()
+        is_endpoint_mask.iter()
+                        .enumerate()
+                        .filter_map(|(i, b)| {
+                            if b {
+                                Some(i)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
     }
 
-    /// Get two sections from 'path': [mid..head] and [mid..tail].
-    /// Return an tuple of 2 PathI32, which are the two paths in the order above.
-    /// The behavior is undefined unless head <= mid <= tail < path.len().
-    fn split_path(path: &PathI32, head: usize, mid: usize, tail: usize) -> (PathI32, PathI32) {
-        assert!(head <= mid);
-        assert!(mid <= tail);
-        assert!(tail < path.len());
+    /// Starting from a determined midpoint that is not on the boundary of 'hole_rect',
+    /// divide 'path' into two subpaths ending at 'tail1' and 'tail2'.
+    /// The behavior is also undefined unless tail1 != tail2 < path.len(), assuming 'path' is in an unclosed form.
+    /// The behavior is also undefined unless both 'tail1' and 'tail2' correspond to points on the boundary of 'hole_rect'.
+    /// The behavior is also undefined unless both 'tail1' and 'tail2' have exactly 1 neighbor that is not on the boundary
+    /// of 'hole_rect'.
+    fn split_path(&self, path: PathI32, tail1: usize, tail2: usize) -> (PathI32, PathI32) {
+        let path = path.to_unclosed();
+        let len = path.len();
 
-        let mut head_to_mid = path[head..=mid].to_vec();
-        head_to_mid.reverse();
-        let mid_to_head = PathI32::from_points(head_to_mid);
+        assert!(tail1 != tail2);
+        assert!(tail1 < len && tail2 < len);
 
-        let mid_to_tail = PathI32::from_points(path[mid..=tail].to_vec());
+        assert!(self.hole_rect.have_point_on_boundary(path[tail1]) &&
+                self.hole_rect.have_point_on_boundary(path[tail2]));
 
-        (mid_to_head, mid_to_tail)
+        // Find the (wrapped) neighbors of 'tail1' and 'tail2' that are not on the boundary of 'hole_rect'
+        let neighbor_not_on_bound = |tail: usize| {
+            let tail_neighbors_idx_dir = vec![(if tail == 0 {len-1} else {tail-1}, -1), (tail+1 % len, 1)];
+            let tail_neighbors_not_on_bound: Vec<(usize, i32)> = 
+                tail_neighbors_idx_dir.into_iter()
+                                .filter(|(idx, _dir)| {
+                                    !self.hole_rect.have_point_on_boundary(path[*idx])
+                                })
+                                .collect();
+            assert_eq!(1, tail_neighbors_not_on_bound.len());
+            tail_neighbors_not_on_bound[0]
+        };
+        let (tail1_neighbor, tail1_direction) = neighbor_not_on_bound(tail1);
+        let (tail2_neighbor, tail2_direction) = neighbor_not_on_bound(tail2);
+
+        // Approach the midpoint from both tails, pushing the points into result subpaths along the way
+        let mut tail1_approacher = tail1_neighbor as i32;
+        let mut tail2_approacher = tail2_neighbor as i32;
+        let mut tail1_points = vec![path[tail1], path[tail1_neighbor]];
+        let mut tail2_points = vec![path[tail2], path[tail2_neighbor]];
+        while tail1_approacher != tail2_approacher {
+            // Approach from tail1
+            tail1_approacher += tail1_direction;
+            tail1_approacher = if tail1_approacher >= 0 {tail1_approacher % len as i32} else {len as i32 - 1};
+
+            tail1_points.push(path[tail1_approacher as usize]);
+
+            // Check for match
+            if tail1_approacher == tail2_approacher {
+                break;
+            }
+
+            // Approach from tail2
+            tail2_approacher += tail2_direction;
+            tail2_approacher = if tail2_approacher >= 0 {tail2_approacher % len as i32} else {len as i32 - 1};
+            
+            tail2_points.push(path[tail2_approacher as usize]);
+
+            // Sanity check
+            assert_ne!(tail1_approacher, tail1 as i32);
+            assert_ne!(tail2_approacher, tail2 as i32);
+        }
+
+        // Want the two subpaths to point into 'hole_rect'
+        tail1_points.reverse();
+        tail2_points.reverse();
+
+        (PathI32::from_points(tail1_points), PathI32::from_points(tail2_points))
     }
 
     /// Calculate the weighted average tangent vector at the tail of 'path'.
@@ -220,45 +284,67 @@ impl Repairer {
         tangent_acc.get_normalized()
     }
 
-    /// Interpolate the curve from 'from_point' to 'to_point' with the provided tangents.
-    /// 'smoothness' is an unbounded parameter that governs the smoothness of the interpolated curve.
-    /// The behavior is undefined unless 0 < smoothness.
-    fn interpolate_curve(from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
-        let find_mid_point = |p1: &PointF64, p2: &PointF64| {
-            let x = (p1.x + p2.x) / 2.0;
-            let y = (p1.y + p2.y) / 2.0;
+    fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
+        let x = (p1.x + p2.x) / 2.0;
+        let y = (p1.y + p2.y) / 2.0;
+        PointF64::new(x, y)
+    }
+
+    // Given lines p1p2 and p3p4, returns their intersection.
+    // If the two lines coincide, returns the mid-pt of p1 and p4.
+    // If the two lines are parallel, panicks.
+    #[allow(non_snake_case)]
+    fn calculate_intersection(&self, p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> PointF64 {
+        // Find the equation of a straight line defined by 2 points in the form of Ax + By = C.
+        let find_line = |a: &PointF64, b: &PointF64| {
+            let A = -(a.y - b.y);
+            let B = a.x - b.x;
+            let C = a.y * (a.x - b.x) - a.x * (a.y - b.y);
+            (A, B, C)
+        };
+
+        let f64_approximately = |a: f64, b: f64| { (a - b).abs() <= 1e-7 };
+
+        let find_intersection = |p1: &PointF64, p2: &PointF64, p3: &PointF64, p4: &PointF64| {
+            let (A1, B1, C1) = find_line(p1, p2);
+            let (A2, B2, C2) = find_line(p3, p4);
+
+            if f64_approximately(A1/A2, B1/B2) && f64_approximately(B1/B2, C1/C2) {
+                return Self::calculate_midpoint(*p1, *p4);
+            }
+
+            let determinant = A1 * B2 - A2 * B1;
+            if f64_approximately(determinant, 0.0) {
+                panic!("Parallel lines in find_intersection()!");
+            }
+
+            let x = (B2 * C1 - B1 * C2) / determinant;
+            let y = (A1 * C2 - A2 * C1) / determinant;
+
             PointF64::new(x, y)
         };
 
-        // Given lines p1p2 and p3p4, returns their intersection.
-        // If the two lines coincide, returns the mid-pt of p2 and p3.
-        // If the two lines are parallel, panicks.
-        // https://github.com/tyt2y3/vaser-unity/blob/master/Assets/Vaser/Vec2Ext.cs#L107 (Intersect)
-        let find_intersection = |p1: &PointF64, p2: &PointF64, p3: &PointF64, p4: &PointF64| {
+        let intersection = find_intersection(&p1, &p2, &p3, &p4);
+        self.draw_util.draw_pixel_i32(&Color::get_palette_color(5), intersection.to_point_i32());
 
-            const EPSILON: f64 = 1e-7;
-            
-            let (denom, numera, numerb);
-            denom  = (p4.y-p3.y) * (p2.x-p1.x) - (p4.x-p3.x) * (p2.y-p1.y);
-            numera = (p4.x-p3.x) * (p1.y-p3.y) - (p4.y-p3.y) * (p1.x-p3.x);
-            numerb = (p2.x-p1.x) * (p1.y-p3.y) - (p2.y-p1.y) * (p1.x-p3.x);
+        intersection
+    }
 
-            if denom <= EPSILON && numera <= EPSILON && numerb <= EPSILON {
-                // The two lines coincide
-                return find_mid_point(p2, p3);
-            }
+    /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
+    fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64) -> Curve<PointF64> {
+        let intersection = self.calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+        
+        bezier::Curve::from_points(
+            from_point,
+            (Self::calculate_midpoint(from_point, intersection), Self::calculate_midpoint(to_point, intersection)),
+            to_point
+        )
+    }
 
-            if denom <= EPSILON {
-                panic!("The two lines are parallel!");
-            }
-
-            let mua = numera/denom;
-
-            PointF64::new(p1.x + mua * (p2.x-p1.x), p1.y + mua * (p2.y-p1.y))
-        };
-
-        let intersection = find_intersection(&from_point, &(from_point+from_tangent), &to_point, &(to_point+to_tangent));
-
+    /// Calculate the quadratic bezier curve from 'from_point' to 'to_point' with the provided tangents.
+    fn calculate_quadratic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
+        let intersection = self.calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+        
         // Find the quadratic Bezier curve
         let mut interpolated_curve = PathF64::new();
         let mut t = 0.0;

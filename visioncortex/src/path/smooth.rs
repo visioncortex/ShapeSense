@@ -101,7 +101,7 @@ impl SubdivideSmooth {
         let mut coords:Vec<Coord2> = vec![];
     
         for i in points.iter() {
-            coords.push(Coord2(i.x as f64, i.y as f64));
+            coords.push(Coord2(i.x, i.y));
         }
     
         let opt = bezier::Curve::fit_from_points(&coords, 10.0);
