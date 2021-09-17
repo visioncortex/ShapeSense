@@ -1,35 +1,42 @@
-import { Repairer } from "image-repair";
+import { DrawingCanvas } from "./canvas";
 
-const inputCanvas = document.getElementById("input") as HTMLCanvasElement;
-const outputCtx = inputCanvas.getContext("2d");
+const originalCanvas = new DrawingCanvas("original");
+originalCanvas.drawBackground();
+originalCanvas.drawForeground();
 
-const inputCanvasCenter = {x: inputCanvas.width/2, y: inputCanvas.height/2};
-
-function setUpCanvas() {
-    outputCtx.fillStyle = "#000000";
-    outputCtx.fillRect(0, 0, inputCanvas.width, inputCanvas.height);
+interface TestInput {
+    canvasId: string;
+    holeRect?: {x: number, y: number, w: number, h: number};
 }
 
-function drawForeground() {
-    outputCtx.fillStyle = "#FF0000";
-    const radii = {x: 50, y: 120};
-    const rotation = 0;
-    const angles = {from: 0, to: 2*Math.PI};
-    outputCtx.ellipse(
-        inputCanvasCenter.x, inputCanvasCenter.y,
-        radii.x, radii.y,
-        rotation,
-        angles.from, angles.to);
-    outputCtx.fill();
-}
+const testInputs: Array<TestInput> = [
+    {
+        canvasId: "test-0",
+        holeRect: {x: 70, y: 5, w: 60, h: 40},
+    },
+    {
+        canvasId: "test-1",
+        holeRect: {x: 45, y: 10, w: 60, h: 40},
+    },
+];
 
-function process() {
-    const maskRect = {x: 370, y: 80, w: 60, h: 40};
-    const repairer = new Repairer("input", maskRect.x, maskRect.y, maskRect.w, maskRect.h);
+testInputs.forEach( (testInput, i) => {
+    const testCanvas = new DrawingCanvas(testInput.canvasId);
 
-    repairer.repair();
-}
+    // Set hover text
+    (testCanvas.canvas.parentElement as HTMLSpanElement).title = testInput.canvasId;
 
-setUpCanvas();
-drawForeground();
-process();
+    testCanvas.drawBackground();
+    testCanvas.drawForeground();
+    testCanvas.holeRect = testInput.holeRect;
+    
+    try {
+        testCanvas.process();
+        console.log("%c Test " + i + " passed!", "color: #00FF00");
+    } catch (e) {
+        console.error(e);
+        console.log("%c Test " + i + " failed!", "color: #FF0000");
+    }
+
+    return testCanvas;
+});

@@ -44,6 +44,7 @@ impl Repairer {
     }
 
     pub fn repair(&self) {
+        //# Path walking
         let paths = self.get_paths();
 
         // paths.iter().enumerate().for_each(|(i, path)| {
@@ -51,6 +52,7 @@ impl Repairer {
         //     self.draw_util.draw_path(Color::get_palette_color(i+1), path);
         // });
 
+        //# Path identification and splitting
         let paths_with_two_endpoints: Vec<(PathI32, Vec<usize>)> = paths
             .into_iter()
             .filter_map(|path| {
@@ -77,16 +79,13 @@ impl Repairer {
         let color2 = Color::get_palette_color(3);
 
         let (curve1, curve2) = self.split_path(path, tail1, tail2);
-        self.draw_util.draw_path_i32(&color1, &curve1);
-        self.draw_util.draw_path_i32(&color2, &curve2);
+        // self.draw_util.draw_path_i32(&color1, &curve1);
+        // self.draw_util.draw_path_i32(&color2, &curve2);
 
+        //# Curve simplification
         let tolerance = 0.7;
-        let mut simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
-        let mut simplified_curve2 = PathI32::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
-
-        // Close the path for smooth function
-        simplified_curve1.add(simplified_curve1[0]);
-        simplified_curve2.add(simplified_curve2[0]);
+        let simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance)).to_closed();
+        let simplified_curve2 = PathI32::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance)).to_closed();
 
         // self.draw_util.draw_path_i32(&color1, &simplified_curve1);
         // self.draw_util.draw_path_i32(&color2, &simplified_curve2);
@@ -94,17 +93,14 @@ impl Repairer {
         // console_log_util(format!("{:?}", simplified_curve1));
         // console_log_util(format!("{:?}", simplified_curve2));
 
+        //# Curve smoothing
         let corner_threshold = std::f64::consts::FRAC_PI_2;
         let outset_ratio = 20.0;
         let segment_length = 0.33;
         let max_iterations = 5;
 
-        let mut smooth_curve1 = simplified_curve1.smooth(corner_threshold, outset_ratio, segment_length, max_iterations);
-        let mut smooth_curve2 = simplified_curve2.smooth(corner_threshold, outset_ratio, segment_length, max_iterations);
-
-        // Remove the last point to make them open curves
-        smooth_curve1.pop();
-        smooth_curve2.pop();
+        let smooth_curve1 = simplified_curve1.smooth(corner_threshold, outset_ratio, segment_length, max_iterations).to_unclosed();
+        let smooth_curve2 = simplified_curve2.smooth(corner_threshold, outset_ratio, segment_length, max_iterations).to_unclosed();
 
         // self.draw_util.draw_path_f64(&color1, &smooth_curve1);
         // self.draw_util.draw_path_f64(&color2, &smooth_curve2);
@@ -115,14 +111,16 @@ impl Repairer {
         // console_log_util(format!("{:?}", &smooth_curve1[(smooth_curve1.len()-5)..]));
         // console_log_util(format!("{:?}", &smooth_curve2[(smooth_curve2.len()-5)..]));
 
+        //# Tail tangent approximation
         let tail_tangent_n = 10;
         let weight_decay_factor = 0.5;
         let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve1, tail_tangent_n, weight_decay_factor);
         let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve2, tail_tangent_n, weight_decay_factor);
-        // let visual_length = 10.0;
-        // self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*visual_length);
-        // self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*visual_length);
+        let visual_length = 10.0;
+        self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*visual_length);
+        self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*visual_length);
         
+        //# Curve interpolation
         let smoothness = 100;
 
         let quadratic_curve = self.calculate_quadratic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
@@ -177,24 +175,52 @@ impl Repairer {
 
     /// Currently naive approach of checking whether points in the path are on the boundary of hole_rect.
     /// Return indices of points on 'path' that are on said boundary.
-    /// The behavior is undefined unless 'path' is closed.
+    /// Note that there are a cluster of points on the boundary, but only the 2 ends of the cluster are
+    /// returned.
     fn find_endpoints_on_path(&self, path: &PathI32) -> Vec<usize> {
-        assert_eq!(path[0], path[path.len()-1]);
-        // The last point is not considered because it is the same as the first in a closed path
-        let is_endpoint_mask = BitVec::from_fn(path.len()-1, |i| {
+        let path = path.to_unclosed();
+        let len = path.len();
+        let is_boundary_mask = BitVec::from_fn(len, |i| {
             self.hole_rect.have_point_on_boundary(path[i])
         });
 
-        is_endpoint_mask.iter()
-                        .enumerate()
-                        .filter_map(|(i, b)| {
-                            if b {
-                                Some(i)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
+        let num_boundary_points = is_boundary_mask.iter().filter(|b| *b).count();
+
+        if num_boundary_points == 0 {
+            return vec![];
+        }
+
+        if num_boundary_points == len {
+            return vec![0, len-1];
+        }
+
+        if !(is_boundary_mask[0] && is_boundary_mask[len-1]) {
+            let boundary_idx: Vec<usize> = is_boundary_mask.into_iter()
+                            .enumerate()
+                            .filter_map(|(i, b)| {
+                                if b {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+            let min = *boundary_idx.iter().min().unwrap();
+            let max = boundary_idx.into_iter().max().unwrap();
+            return vec![min, max];
+        }
+
+        // Find the endpoint starting from 0
+        let mut endpoint1 = 0;
+        while is_boundary_mask[endpoint1] { endpoint1 += 1; }
+        endpoint1 -= 1;
+
+        // Find the endpoint starting from len-1
+        let mut endpoint2 = len-1;
+        while is_boundary_mask[endpoint2] { endpoint2 -= 1; }
+        endpoint2 += 1;
+
+        vec![endpoint1, endpoint2]
     }
 
     /// Starting from a determined midpoint that is not on the boundary of 'hole_rect',

@@ -107,10 +107,10 @@ where
 {
     /// Convert a closed path to an unclosed path.
     /// A clone of 'self' is returned untouched if 'self' is unclosed.
-    pub fn to_unclosed(self) -> Self {        
+    pub fn to_unclosed(&self) -> Self {        
         let len = self.len();
         if self.path[0] != self.path[len-1] {
-            self
+            self.clone()
         } else {
             Self::from_points(self.path[0..(len-1)].to_vec())
         }
@@ -118,10 +118,10 @@ where
 
     /// Convert an unclosed path to a closed path.
     /// A clone of 'self' is returned untouched if 'self' is closed.
-    pub fn to_closed(self) -> Self {
+    pub fn to_closed(&self) -> Self {
         let len = self.len();
         if self.path[0] == self.path[len-1] {
-            self
+            self.clone()
         } else {
             let mut points = self.path.clone();
             points.push(self.path[0].clone());
