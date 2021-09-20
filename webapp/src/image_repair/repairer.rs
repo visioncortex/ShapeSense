@@ -361,6 +361,7 @@ impl Repairer {
     
     /// Calculate the weighted average tangent vector at the tail of 'path'.
     /// The last 'n' points are taken into account.
+    /// The weights are stronger towards the tail.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
     fn calculate_weighted_average_tangent_at_tail(path: PathF64, n: usize) -> PointF64 {
         let len = path.len();
@@ -371,7 +372,8 @@ impl Repairer {
         let rev_points: Vec<PointF64> = path.path.into_iter().rev().take(n).collect();
         for point_pair in rev_points.windows(2) {
             let (from, to) = (point_pair[1], point_pair[0]);
-            tangent_acc += to - from;
+            tangent_acc *= 2.0; // Stronger weights towards the end
+            tangent_acc += (to - from).get_normalized();
         }
 
         tangent_acc.get_normalized()
