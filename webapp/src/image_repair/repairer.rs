@@ -1,5 +1,5 @@
 use bit_vec::BitVec;
-use flo_curves::{BezierCurve, BezierCurveFactory, bezier::{self, Curve}};
+use flo_curves::{BezierCurve, BezierCurveFactory, bezier};
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
@@ -186,7 +186,7 @@ impl Repairer {
 
         // Find the (wrapped) neighbors of 'tail1' and 'tail2' that are not on the boundary of 'hole_rect'
         let neighbor_not_on_bound = |tail: usize| {
-            let tail_neighbors_idx_dir = vec![(if tail == 0 {len-1} else {tail-1}, -1), (tail+1 % len, 1)];
+            let tail_neighbors_idx_dir = vec![(if tail == 0 {len-1} else {tail-1}, -1), ((tail+1) % len, 1)];
             let tail_neighbors_not_on_bound: Vec<(usize, i32)> = 
                 tail_neighbors_idx_dir.into_iter()
                                 .filter(|(idx, _dir)| {
@@ -254,6 +254,7 @@ impl Repairer {
         let (curve1, curve2) = (curve1, curve2);
 
         let (endpoint1, endpoint2) = (curve1[curve1.len()-1], curve2[curve2.len()-1]);
+        let base_length = (endpoint1 - endpoint2).norm();
 
         //# Curve simplification
         let tolerance = 2.5;
@@ -277,12 +278,12 @@ impl Repairer {
         //# Tail tangent approximation
         let tail_tangent_n = 5;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
-        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, std::cmp::min(tail_tangent_n, smooth_curve1_len));
-        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, std::cmp::min(tail_tangent_n, smooth_curve2_len));
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length);
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, std::cmp::min(tail_tangent_n, smooth_curve2_len), base_length);
 
-        // let tangent_visual_length = 20.0;
-        // draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
-        // draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
+        let tangent_visual_length = 20.0;
+        draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
+        draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
         
         //# Curve interpolation
         let smoothness = 100;
@@ -361,20 +362,28 @@ impl Repairer {
     }
     
     /// Calculate the weighted average tangent vector at the tail of 'path'.
-    /// The last 'n' points are taken into account.
+    /// Either the last 'n' points, or the most number of points at the tail such that the sum of segment
+    /// lengths is at most base_length are taken into account.
     /// The weights are stronger towards the tail.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
-    fn calculate_weighted_average_tangent_at_tail(path: PathF64, n: usize) -> PointF64 {
+    fn calculate_weighted_average_tangent_at_tail(path: PathF64, n: usize, base_length: f64) -> PointF64 {
         let len = path.len();
         assert!(1 < n);
         assert!(n <= len);
 
         let mut tangent_acc = PointF64::default();
+        let mut length_acc = 0.0;
         let rev_points: Vec<PointF64> = path.path.into_iter().rev().take(n).collect();
         for point_pair in rev_points.windows(2) {
             let (from, to) = (point_pair[1], point_pair[0]);
+            let from_to = to - from;
             tangent_acc *= 2.0; // Stronger weights towards the tail (multiplied more times)
-            tangent_acc += (to - from).get_normalized();
+            tangent_acc += from_to.get_normalized();
+
+            length_acc += from_to.norm();
+            if length_acc >= base_length {
+                break;
+            }
         }
 
         tangent_acc.get_normalized()

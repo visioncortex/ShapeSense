@@ -19,17 +19,18 @@ function createHTMLCanvasElement(canvasId: string) {
 }
 
 testInputs.forEach( (testInput, i) => {
+    console.groupCollapsed(testInput.canvasId);
+
     createHTMLCanvasElement(testInput.canvasId);
 
     const testCanvas = new DrawingCanvas(testInput.canvasId);
 
     testCanvas.drawBackground();
 
-    if (typeof testInput.drawForeground === typeof undefined) {
-        testCanvas.drawForeground();
-    } else {
-        testInput.drawForeground(testCanvas);
+    if (typeof testInput.drawForeground !== typeof undefined) {
+        testCanvas.drawForeground = () => testInput.drawForeground(testCanvas);
     }
+    testCanvas.drawForeground();
 
     testCanvas.holeRect = testInput.holeRect;
     
@@ -41,5 +42,6 @@ testInputs.forEach( (testInput, i) => {
         console.log("%c Test " + testInput.canvasId + " failed!", "color: #FF0000");
     }
 
+    console.groupEnd();
     return testCanvas;
 });

@@ -56,4 +56,40 @@ export const testInputs: Array<TestInput> = [
             canvas.ctx.fill();
         }
     },
+    {
+        canvasId: "rectangle top left",
+        holeRect: {x: 10, y: 10, w: 70, h: 70},
+        drawForeground:(canvas) => {
+            canvas.ctx.fillStyle = "#FF0000";
+            canvas.ctx.fillRect(40, 40, 120, 220);
+            canvas.ctx.fill();
+        },
+    },
+    {
+        canvasId: "rectangle middle left (1)",
+        holeRect: {x: 10, y: 100, w: 70, h: 70},
+        drawForeground:(canvas) => {
+            canvas.ctx.fillStyle = "#FF0000";
+            canvas.ctx.fillRect(40, 40, 120, 220);
+            canvas.ctx.fill();
+        }
+    },
+    {
+        canvasId: "rectangle middle left (2)",
+        holeRect: {x: 10, y: 110, w: 70, h: 70},
+        drawForeground:(canvas) => {
+            canvas.ctx.fillStyle = "#FF0000";
+            canvas.ctx.fillRect(40, 40, 120, 220);
+            canvas.ctx.fill();
+        }
+    },
+    {
+        canvasId: "rectangle bottom left",
+        holeRect: {x: 10, y: 210, w: 70, h: 70},
+        drawForeground:(canvas) => {
+            canvas.ctx.fillStyle = "#FF0000";
+            canvas.ctx.fillRect(40, 40, 120, 220);
+            canvas.ctx.fill();
+        }
+    },
 ];
