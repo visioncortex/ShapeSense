@@ -3,7 +3,7 @@ use web_sys::CanvasRenderingContext2d;
 
 use crate::canvas::Canvas;
 
-pub(crate) struct DrawUtil {
+pub struct DrawUtil {
     pub canvas: Canvas
 }
 
