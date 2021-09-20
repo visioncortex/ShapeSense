@@ -456,22 +456,3 @@ impl Repairer {
         interpolated_curve
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn point_f64_approx(a: PointF64, b: PointF64) -> bool {
-        (a-b).norm() < 1e-5
-    }
-
-    #[test]
-    fn tail_gradient() {
-        let mut path = PathF64::new();
-        path.add(PointF64::new(0.5, 0.0));
-        path.add(PointF64::new(1.0, 2.0));
-        path.add(PointF64::new(2.0, 4.0));
-        assert!(point_f64_approx(PointF64::new(1.0, 2.0).get_normalized(), Repairer::calculate_weighted_average_tangent_at_tail(&path, 2, 0.5)));
-        assert!(point_f64_approx(PointF64::new(0.3810091792, 0.9245712548), Repairer::calculate_weighted_average_tangent_at_tail(&path, 3, 0.5)));
-    }
-}
