@@ -202,7 +202,7 @@ impl SubdivideSmooth {
         (PathF64::from_points(new_path), new_corners, can_terminate_iteration)
     }
 
-    /// Finds mid-points between (p_i and p_j) and (p_1 and p_2),
+    /// Finds mid-points between (p_i and p_j) and (p_1 and p_2), where p_i and p_j should be between p_1 and p_2,
     /// then returns the new point constructed by the 4-point scheme
     fn find_new_point_from_4_point_scheme(
         p_i: &PointF64, p_j: &PointF64, p_1: &PointF64, p_2: &PointF64, outset_ratio: f64

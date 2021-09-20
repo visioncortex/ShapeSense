@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bit_vec::BitVec;
 use flo_curves::{BezierCurve, BezierCurveFactory, bezier::{self, Curve}};
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
@@ -84,8 +82,8 @@ impl Repairer {
 
         //# Curve simplification
         let tolerance = 0.7;
-        let simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance)).to_closed();
-        let simplified_curve2 = PathI32::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance)).to_closed();
+        let simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
+        let simplified_curve2 = PathI32::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
 
         // self.draw_util.draw_path_i32(&color1, &simplified_curve1);
         // self.draw_util.draw_path_i32(&color2, &simplified_curve2);
@@ -94,47 +92,40 @@ impl Repairer {
         // console_log_util(format!("{:?}", simplified_curve2));
 
         //# Curve smoothing
-        let corner_threshold = std::f64::consts::FRAC_PI_2;
-        let outset_ratio = 20.0;
-        let segment_length = 0.33;
-        let max_iterations = 5;
+        let outset_ratio = 8.0;
+        let min_segment_length = 1.0;
+        let max_iterations = 3;
 
-        let smooth_curve1 = simplified_curve1.smooth(corner_threshold, outset_ratio, segment_length, max_iterations).to_unclosed();
-        let smooth_curve2 = simplified_curve2.smooth(corner_threshold, outset_ratio, segment_length, max_iterations).to_unclosed();
+        let smooth_curve1 = self.smoothen_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations);
+        let smooth_curve2 = self.smoothen_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations);
 
-        // self.draw_util.draw_path_f64(&color1, &smooth_curve1);
-        // self.draw_util.draw_path_f64(&color2, &smooth_curve2);
+        self.draw_util.draw_path_f64(&color1, &smooth_curve1);
+        self.draw_util.draw_path_f64(&color2, &smooth_curve2);
 
         // console_log_util(format!("{} {}", simplified_curve1.len(), smooth_curve1.len()));
         // console_log_util(format!("{} {}", simplified_curve2.len(), smooth_curve2.len()));
 
-        // console_log_util(format!("{:?}", &smooth_curve1[(smooth_curve1.len()-5)..]));
-        // console_log_util(format!("{:?}", &smooth_curve2[(smooth_curve2.len()-5)..]));
+        // console_log_util(format!("{:?}", &smooth_curve1[(smooth_curve1.len()-10)..]));
+        // console_log_util(format!("{:?}", &smooth_curve2[(smooth_curve2.len()-10)..]));
 
         //# Tail tangent approximation
-        let tail_tangent_n = 10;
-        let weight_decay_factor = 0.5;
-        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve1, tail_tangent_n, weight_decay_factor);
-        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(&smooth_curve2, tail_tangent_n, weight_decay_factor);
-        let visual_length = 10.0;
-        self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*visual_length);
-        self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*visual_length);
+        let tail_tangent_n = 5;
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, tail_tangent_n);
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, tail_tangent_n);
+
+        let tangent_visual_length = 10.0;
+        self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*tangent_visual_length);
+        self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*tangent_visual_length);
         
         //# Curve interpolation
         let smoothness = 100;
 
         let quadratic_curve = self.calculate_quadratic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
-        self.draw_util.draw_path_f64(&Color::get_palette_color(6), &quadratic_curve);
 
-        let cubic_curve = self.calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2);
-        let points: Vec<PointF64> = (0..smoothness)
-            .into_iter()
-            .map(|i| {
-                let t = i as f64 / smoothness as f64;
-                cubic_curve.point_at_pos(t)
-            })
-            .collect();
-        self.draw_util.draw_path_f64(&Color::get_palette_color(4), &PathF64::from_points(points));
+        let cubic_curve = self.calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
+
+        self.draw_util.draw_path_f64(&Color::get_palette_color(6), &quadratic_curve);
+        self.draw_util.draw_path_f64(&Color::get_palette_color(4), &cubic_curve);
     }
 }
 
@@ -289,22 +280,89 @@ impl Repairer {
         (PathI32::from_points(tail1_points), PathI32::from_points(tail2_points))
     }
 
+    /// Apply the 4-point scheme subdivision on 'path' in a convolutional manner iteratively.
+    /// Segments (at any point during iteration) shorter than 'min_segment_length' are not further subdivided.
+    /// If no subdivision is performed, the iterative process is terminated early.
+    /// The behavior is undefined unless path.len() >= 4
+    fn smoothen_open_curve_iterative(&self, path: PathI32, outset_ratio: f64, min_segment_length: f64, max_iterations: usize) -> PathF64 {
+        assert!(path.len() >= 4);
+        
+        let mut smooth_curve = path.to_path_f64();
+        
+        for _ in 0..max_iterations {
+            let can_terminate_early = self.smoothen_open_curve_step(&mut smooth_curve, outset_ratio, min_segment_length);
+
+            // Early termination
+            if can_terminate_early {
+                break;
+            }
+        }
+
+        smooth_curve
+    }
+
+    /// Return true if no subdivision is done in this step.
+    fn smoothen_open_curve_step(&self, path: &mut PathF64, outset_ratio: f64, min_segment_length: f64) -> bool {
+        let mut new_points = vec![path[0]];
+
+        // Apply 4-point scheme on 'path' in a convolutional manner
+        for points in path.path.windows(4) {
+            new_points.push(points[1]);
+
+            // Threshold on segment length of the segment to be broken down
+            let checked_segment_length = (points[1] - points[2]).norm();
+            if checked_segment_length >= min_segment_length {
+                new_points.push(Self::find_new_point_from_4_point_scheme(
+                    &points[0], &points[1], &points[2], &points[3], outset_ratio));
+            }    
+        }
+
+        // Push the last 2 points
+        new_points.extend(path.path.iter().rev().take(2).rev());
+
+        if new_points.len() == path.len() { // no additional points after this step
+            true
+        } else {
+            *path = PathF64::from_points(new_points);
+            false
+        }
+    }
+
+    /// Finds mid-points between (p_i and p_j) and (p_1 and p_2), where p_i and p_j should be between p_1 and p_2,
+    /// then returns the new point constructed by the 4-point scheme
+    fn find_new_point_from_4_point_scheme(
+        p_i: &PointF64, p_j: &PointF64, p_1: &PointF64, p_2: &PointF64, outset_ratio: f64
+    ) -> PointF64 {
+
+        let mid_out = Self::calculate_midpoint(*p_i, *p_j);
+        let mid_in = Self::calculate_midpoint(*p_1, *p_2);
+
+        let vector_out: PointF64 = mid_out - mid_in;
+        let new_magnitude = vector_out.norm() / outset_ratio;
+        if new_magnitude < 1e-5 {
+            // mid_out == mid_in in this case
+            return mid_out;
+        }
+        let unit_vector = vector_out.get_normalized();
+        let frac_vector = PointF64 {x: unit_vector.x * new_magnitude, y: unit_vector.y * new_magnitude};
+
+        // Point out from mid_out
+        mid_out + frac_vector
+    }
+    
     /// Calculate the weighted average tangent vector at the tail of 'path'.
     /// The last 'n' points are taken into account.
-    /// The tangents closer to the tail receive higher weightings.
-    /// A smaller 'weight_decay_factor' indicates a faster decay *farther* away from the tail.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
-    fn calculate_weighted_average_tangent_at_tail(path: &PathF64, n: usize, weight_decay_factor: f64) -> PointF64 {
+    fn calculate_weighted_average_tangent_at_tail(path: PathF64, n: usize) -> PointF64 {
         let len = path.len();
         assert!(1 < n);
         assert!(n <= len);
 
         let mut tangent_acc = PointF64::default();
-        let mut from = path[len-n];
-        for i in (len-n+1)..len {
-            let to = path[i];
-            tangent_acc = (tangent_acc + (to - from).get_normalized()) * weight_decay_factor;
-            from = to;
+        let rev_points: Vec<PointF64> = path.path.into_iter().rev().take(n).collect();
+        for point_pair in rev_points.windows(2) {
+            let (from, to) = (point_pair[1], point_pair[0]);
+            tangent_acc += to - from;
         }
 
         tangent_acc.get_normalized()
@@ -357,14 +415,24 @@ impl Repairer {
     }
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
-    fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64) -> Curve<PointF64> {
+    fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
         let intersection = self.calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
         
-        bezier::Curve::from_points(
+        let curve = bezier::Curve::from_points(
             from_point,
             (Self::calculate_midpoint(from_point, intersection), Self::calculate_midpoint(to_point, intersection)),
             to_point
-        )
+        );
+        
+        let points: Vec<PointF64> = (0..smoothness)
+            .into_iter()
+            .map(|i| {
+                let t = i as f64 / smoothness as f64;
+                curve.point_at_pos(t)
+            })
+            .collect();
+
+        PathF64::from_points(points)
     }
 
     /// Calculate the quadratic bezier curve from 'from_point' to 'to_point' with the provided tangents.
