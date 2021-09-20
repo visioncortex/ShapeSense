@@ -416,11 +416,26 @@ impl Repairer {
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
+        let base_length = (from_point - to_point).norm();    
         let intersection = self.calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+
+        let length_from_and_intersection = (from_point - intersection).norm();
+        let length_to_and_intersection = (to_point - intersection).norm();
+
+        let control_point1 = if base_length > length_from_and_intersection * 0.5 {
+            Self::calculate_midpoint(from_point, intersection)
+        } else {
+            from_point + from_tangent.get_normalized() * base_length
+        };
+        let control_point2 = if base_length > length_to_and_intersection * 0.5 {
+            Self::calculate_midpoint(to_point, intersection)
+        } else {
+            to_point + to_tangent.get_normalized() * base_length
+        };
         
         let curve = bezier::Curve::from_points(
             from_point,
-            (Self::calculate_midpoint(from_point, intersection), Self::calculate_midpoint(to_point, intersection)),
+            (control_point1, control_point2),
             to_point
         );
         
