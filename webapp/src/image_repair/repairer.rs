@@ -81,7 +81,7 @@ impl Repairer {
         // self.draw_util.draw_path_i32(&color2, &curve2);
 
         //# Curve simplification
-        let tolerance = 0.7;
+        let tolerance = 2.5;
         let simplified_curve1 = PathI32::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
         let simplified_curve2 = PathI32::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
 
@@ -93,8 +93,8 @@ impl Repairer {
 
         //# Curve smoothing
         let outset_ratio = 8.0;
-        let min_segment_length = 1.0;
-        let max_iterations = 3;
+        let min_segment_length = 4.0;
+        let max_iterations = 5;
 
         let smooth_curve1 = self.smoothen_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations);
         let smooth_curve2 = self.smoothen_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations);
@@ -113,18 +113,18 @@ impl Repairer {
         let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, tail_tangent_n);
         let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, tail_tangent_n);
 
-        let tangent_visual_length = 10.0;
-        self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*tangent_visual_length);
-        self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*tangent_visual_length);
+        // let tangent_visual_length = 20.0;
+        // self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1*tangent_visual_length);
+        // self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2*tangent_visual_length);
         
         //# Curve interpolation
         let smoothness = 100;
 
-        let quadratic_curve = self.calculate_quadratic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
+        // let quadratic_curve = self.calculate_quadratic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
 
         let cubic_curve = self.calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness);
 
-        self.draw_util.draw_path_f64(&Color::get_palette_color(6), &quadratic_curve);
+        // self.draw_util.draw_path_f64(&Color::get_palette_color(6), &quadratic_curve);
         self.draw_util.draw_path_f64(&Color::get_palette_color(4), &cubic_curve);
     }
 }
@@ -305,6 +305,9 @@ impl Repairer {
     fn smoothen_open_curve_step(&self, path: &mut PathF64, outset_ratio: f64, min_segment_length: f64) -> bool {
         let mut new_points = vec![path[0]];
 
+        // Duplicate the last point to make sure all segments except the first are taken care of
+        path.add(path[path.len()-1]);
+
         // Apply 4-point scheme on 'path' in a convolutional manner
         for points in path.path.windows(4) {
             new_points.push(points[1]);
@@ -313,12 +316,18 @@ impl Repairer {
             let checked_segment_length = (points[1] - points[2]).norm();
             if checked_segment_length >= min_segment_length {
                 new_points.push(Self::find_new_point_from_4_point_scheme(
-                    &points[0], &points[1], &points[2], &points[3], outset_ratio));
+                    &points[1], &points[2], &points[0], &points[3], outset_ratio));
             }    
         }
 
         // Push the last 2 points
-        new_points.extend(path.path.iter().rev().take(2).rev());
+        new_points.extend(
+            path.path.iter()
+                     .rev() // To get the last
+                     .skip(1) // To skip the artificial duplicate point
+                     .take(2) // To get the last two points
+                     .rev() // In the original order
+        );
 
         if new_points.len() == path.len() { // no additional points after this step
             true
@@ -416,7 +425,7 @@ impl Repairer {
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
-        let base_length = (from_point - to_point).norm();    
+        let base_length = (from_point - to_point).norm() * 2.0;    
         let intersection = self.calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
 
         let length_from_and_intersection = (from_point - intersection).norm();
