@@ -7,6 +7,14 @@ const displaySelector = DisplaySelector.None;
 const displayTangents = false;
 // End of Controls
 
+const currentShape = parseInt(document.body.id, 10);
+if (currentShape !== NaN) {
+    if (currentShape > 1)
+        (document.getElementById("back") as HTMLAnchorElement).href = `./shape${currentShape-1}.html`;
+    if (currentShape < shapeTestInputs.size)
+        (document.getElementById("next") as HTMLAnchorElement).href = `./shape${currentShape+1}.html`;
+}
+
 const originalCanvas = new DrawingCanvas("original");
 
 function createHTMLCanvasElement(canvasId: string, index: number) {
@@ -56,8 +64,8 @@ switch (document.body.id) {
         originalCanvas.drawForeground();
         break;
     default:
-        testInputs = shapeTestInputs.get(document.body.id);
-        await originalCanvas.loadImage(`./assets/${document.body.id}.png`);
+        testInputs = shapeTestInputs.get("shape" + document.body.id);
+        await originalCanvas.loadImage(`./assets/shape${document.body.id}.png`);
 }
 
 const statusPromiseFactories = testInputs.map( (testInput, i) => async () => {
