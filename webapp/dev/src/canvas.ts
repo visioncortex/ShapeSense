@@ -27,6 +27,18 @@ export class DrawingCanvas {
         this.ctx.fillRect(0, 0, this.width(), this.height());
     }
 
+    loadImage(src: string) {
+        let img = new Image();
+        return new Promise<void>( (resolve, reject) => {
+            img.onload = () => {
+                this.ctx.drawImage(img, 0, 0);
+                resolve();
+            };
+            img.onerror = reject;
+            img.src = src;
+        });
+    }
+
     drawForeground() {
         this.ctx.fillStyle = "#FF0000";
         const radii = {x: 50, y: 120};

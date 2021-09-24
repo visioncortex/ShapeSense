@@ -260,7 +260,7 @@ impl Repairer {
         let base_length = endpoint1.distance_to(endpoint2);
 
         //# Curve simplification
-        let tolerance = 2.5;
+        let tolerance = 1.5;
         let simplified_curve1 = PathF64::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
         let simplified_curve2 = PathF64::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
 
@@ -280,12 +280,13 @@ impl Repairer {
         draw_util.draw_path_f64(&color2, &smooth_curve2);
 
         //# Tail tangent approximation
-        let tail_tangent_n = 5;
+        let tail_tangent_n = 8;
+        let tail_weight_multiplier = 1.0;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
-        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length);
-        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, &corners2, std::cmp::min(tail_tangent_n, smooth_curve2_len), base_length);
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length, tail_weight_multiplier);
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, &corners2, std::cmp::min(tail_tangent_n, smooth_curve2_len), base_length, tail_weight_multiplier);
 
-        let tangent_visual_length = 20.0;
+        let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
         draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
         draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
         
@@ -367,9 +368,9 @@ impl Repairer {
     /// Either the last 'n' points, the most number of points at the tail such that the sum of segment
     /// lengths is at most base_length, or the last points until a corner is seen, whichever is the smallest,
     /// are taken into account.
-    /// The weights are stronger towards the tail.
+    /// The weights are stronger towards the tail, this is specified by 'tail_weight_multiplier'.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
-    fn calculate_weighted_average_tangent_at_tail(path: PathF64, corners: &[bool], n: usize, base_length: f64) -> PointF64 {
+    fn calculate_weighted_average_tangent_at_tail(path: PathF64, corners: &[bool], n: usize, base_length: f64, tail_weight_multiplier: f64) -> PointF64 {
         let len = path.len();
         assert!(1 < n);
         assert!(n <= len);
@@ -386,7 +387,7 @@ impl Repairer {
 
             let (from, to) = (point_pair[1], point_pair[0]);
             let from_to = to - from;
-            tangent_acc *= 2.0; // Stronger weights towards the tail (multiplied more times)
+            tangent_acc *= tail_weight_multiplier; // Stronger weights towards the tail (multiplied more times)
             tangent_acc += from_to.get_normalized();
 
             length_acc += from_to.norm();
