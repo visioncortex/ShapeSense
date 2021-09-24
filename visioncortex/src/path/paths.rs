@@ -106,8 +106,12 @@ where
     T: Clone + PartialEq
 {
     /// Convert a closed path to an unclosed path.
-    /// A clone of 'self' is returned untouched if 'self' is unclosed.
-    pub fn to_unclosed(&self) -> Self {        
+    /// A clone of 'self' is returned untouched if 'self' is empty or unclosed.
+    pub fn to_unclosed(&self) -> Self {
+        if self.is_empty() {
+            return self.clone();
+        }
+        
         let len = self.len();
         if self.path[0] != self.path[len-1] {
             self.clone()
@@ -117,8 +121,12 @@ where
     }
 
     /// Convert an unclosed path to a closed path.
-    /// A clone of 'self' is returned untouched if 'self' is closed.
+    /// A clone of 'self' is returned untouched if 'self' is empty or closed.
     pub fn to_closed(&self) -> Self {
+        if self.is_empty() {
+            return self.clone();
+        }
+
         let len = self.len();
         if self.path[0] == self.path[len-1] {
             self.clone()
