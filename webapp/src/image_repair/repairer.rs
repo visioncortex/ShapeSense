@@ -257,7 +257,7 @@ impl Repairer {
         let (curve1, curve2) = (curve1, curve2);
 
         let (endpoint1, endpoint2) = (curve1[curve1.len()-1], curve2[curve2.len()-1]);
-        let base_length = (endpoint1 - endpoint2).norm();
+        let base_length = endpoint1.distance_to(endpoint2);
 
         //# Curve simplification
         let tolerance = 2.5;
@@ -340,7 +340,7 @@ impl Repairer {
             }
 
             // Threshold on segment length of the segment to be broken down
-            let checked_segment_length = (points[1] - points[2]).norm();
+            let checked_segment_length = points[1].distance_to(points[2]);
             if checked_segment_length >= min_segment_length {
                 new_points.push(find_new_point_from_4_point_scheme(
                     &points[1], &points[2], &points[0], &points[3], outset_ratio));
@@ -400,11 +400,11 @@ impl Repairer {
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     fn calculate_cubic_curve(from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
-        let scaled_base_length = (from_point - to_point).norm() * 2.0;    
+        let scaled_base_length = from_point.distance_to(to_point) * 2.0;    
         let intersection = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
 
-        let length_from_and_intersection = (from_point - intersection).norm();
-        let length_to_and_intersection = (to_point - intersection).norm();
+        let length_from_and_intersection = from_point.distance_to(intersection);
+        let length_to_and_intersection = to_point.distance_to(intersection);
 
         let evaluate_control_point = |point: PointF64, tangent:PointF64, length_with_intersection: f64| {
             if scaled_base_length > length_with_intersection * 0.5 {

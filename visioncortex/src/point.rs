@@ -51,7 +51,7 @@ where
 
 impl<T> Point2<T>
 where
-    T: Default + Float,
+    T: Float,
 {
     #[inline]
     pub fn rotate(&self, origin: Self, angle: T) -> Self {
@@ -64,10 +64,22 @@ where
     }
 
     #[inline]
+    /// The L2-norm
     pub fn norm(self) -> T {
         self.dot(self).sqrt()
     }
 
+    #[inline]
+    /// The euclidean distance
+    pub fn distance_to(&self, other: Point2<T>) -> T {
+        (*self - other).norm()
+    }
+}
+
+impl<T> Point2<T>
+where
+    T: Default + Float,
+{
     #[inline]
     pub fn get_normalized(&self) -> Self {
         let norm = self.norm();
