@@ -101,7 +101,9 @@ export interface FileTestInput extends TestInput {
     src: string,
 }
 
-export const shape1TestInputs: Array<FileTestInput> = [
+export const shapeTestInputs: Map<string, Array<FileTestInput> > = new Map();
+
+shapeTestInputs.set("shape1", [
     {
         canvasId: "top left",
         holeRect: {x: 25, y: 30, w: 30, h: 30},
@@ -147,4 +149,52 @@ export const shape1TestInputs: Array<FileTestInput> = [
         holeRect: {x: 70, y: 80, w: 30, h: 30},
         src: "./assets/shape1.png"
     },
-];
+]);
+
+shapeTestInputs.set("shape2", [
+    {
+        canvasId: "top left",
+        holeRect: {x: 15, y: 5, w: 40, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "top center",
+        holeRect: {x: 40, y: 5, w: 40, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "top right",
+        holeRect: {x: 60, y: 10, w: 40, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "middle left",
+        holeRect: {x: 5, y: 30, w: 25, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "random",
+        holeRect: {x: 40, y: 35, w: 40, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "middle right",
+        holeRect: {x: 80, y: 30, w: 30, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "bottom left",
+        holeRect: {x: 10, y: 60, w: 40, h: 20},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "bottom center",
+        holeRect: {x: 30, y: 55, w: 25, h: 15},
+        src: "./assets/shape2.png"
+    },
+    {
+        canvasId: "bottom right",
+        holeRect: {x: 65, y: 55, w: 40, h: 20},
+        src: "./assets/shape2.png"
+    },
+]);

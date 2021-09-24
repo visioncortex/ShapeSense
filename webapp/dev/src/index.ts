@@ -1,8 +1,13 @@
+import { DisplaySelector } from "image-repair";
 import { DrawingCanvas } from "./canvas";
-import { shape1TestInputs, FileTestInput, IndexTestInput, indexTestInputs, TestInput } from "./tests";
+import { shapeTestInputs, FileTestInput, IndexTestInput, indexTestInputs, TestInput } from "./tests";
+
+// Controls
+const displaySelector = DisplaySelector.None;
+const displayTangents = false;
+// End of Controls
 
 const originalCanvas = new DrawingCanvas("original");
-originalCanvas.drawBackground();
 
 function createHTMLCanvasElement(canvasId: string, index: number) {
     let canvas = document.createElement("CANVAS") as HTMLCanvasElement;
@@ -29,7 +34,7 @@ function process(canvas: DrawingCanvas, testInput: TestInput) {
     let status: {canvasId: string, success: boolean};
     
     try {
-        canvas.process();
+        canvas.process(displaySelector, displayTangents);
         status = {canvasId: testInput.canvasId, success: true};
     } catch (e) {
         console.error(e);
@@ -41,6 +46,8 @@ function process(canvas: DrawingCanvas, testInput: TestInput) {
 
 async function run() {
 
+originalCanvas.drawBackground();
+
 let testInputs: Array<TestInput>;
 
 switch (document.body.id) {
@@ -49,7 +56,7 @@ switch (document.body.id) {
         originalCanvas.drawForeground();
         break;
     default:
-        testInputs = shape1TestInputs;
+        testInputs = shapeTestInputs.get(document.body.id);
         await originalCanvas.loadImage(`./assets/${document.body.id}.png`);
 }
 

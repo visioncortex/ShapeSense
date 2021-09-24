@@ -8,8 +8,19 @@ use crate::{image_repair::{calculate_intersection, calculate_midpoint, find_corn
 use super::draw::DrawUtil;
 
 #[wasm_bindgen]
+#[derive(PartialEq)]
+pub enum DisplaySelector {
+    None,
+    Raw,
+    Simplified,
+    Smoothed,
+}
+
+#[wasm_bindgen]
 pub struct Repairer {
     draw_util: DrawUtil,
+    display_selector: DisplaySelector,
+    display_tangents: bool,
     image: ColorImage,
     hole_rect: BoundingRect,
 }
@@ -18,7 +29,7 @@ pub struct Repairer {
 #[wasm_bindgen]
 impl Repairer {
     #[wasm_bindgen(constructor)]
-    pub fn new_from_canvas_id_and_mask(canvas_id: &str, x: usize, y: usize, w: usize, h: usize) -> Self {
+    pub fn new_from_canvas_id_and_mask(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool, x: usize, y: usize, w: usize, h: usize) -> Self {
         let draw_util = DrawUtil::new_from_canvas_id(canvas_id);
         let canvas = &draw_util.canvas;
 
@@ -39,7 +50,7 @@ impl Repairer {
         // Draw hole on canvas
         draw_util.fill_rect(&empty_color, x, y, w, h);
 
-        Self { draw_util, image, hole_rect }
+        Self { draw_util, display_selector, display_tangents, image, hole_rect }
     }
 
     pub fn repair(&self) {
@@ -75,8 +86,10 @@ impl Repairer {
         let color2 = Color::get_palette_color(3);
 
         let (curve1, curve2) = self.split_path(path, tail1, tail2);
-        // self.draw_util.draw_path_i32(&color1, &curve1);
-        // self.draw_util.draw_path_i32(&color2, &curve2);
+        if self.display_selector == DisplaySelector::Raw {
+            self.draw_util.draw_path_i32(&color1, &curve1);
+            self.draw_util.draw_path_i32(&color2, &curve2);
+        }
 
         let interpolated_curve = self.interpolate_curve_between_curves(curve1.to_path_f64(), curve2.to_path_f64(), true, true, &self.draw_util);
         
@@ -264,8 +277,10 @@ impl Repairer {
         let simplified_curve1 = PathF64::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
         let simplified_curve2 = PathF64::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
 
-        // draw_util.draw_path_f64(&color1, &simplified_curve1);
-        // draw_util.draw_path_f64(&color2, &simplified_curve2);
+        if self.display_selector == DisplaySelector::Simplified {
+            draw_util.draw_path_f64(&color1, &simplified_curve1);
+            draw_util.draw_path_f64(&color2, &simplified_curve2);
+        }
 
         //# Curve smoothing
         let outset_ratio = 8.0;
@@ -276,19 +291,23 @@ impl Repairer {
         let (smooth_curve1, corners1) = Self::smoothen_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
         let (smooth_curve2, corners2) = Self::smoothen_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
 
-        draw_util.draw_path_f64(&color1, &smooth_curve1);
-        draw_util.draw_path_f64(&color2, &smooth_curve2);
+        if self.display_selector == DisplaySelector::Smoothed {
+            draw_util.draw_path_f64(&color1, &smooth_curve1);
+            draw_util.draw_path_f64(&color2, &smooth_curve2);
+        }
 
         //# Tail tangent approximation
         let tail_tangent_n = 8;
-        let tail_weight_multiplier = 1.0;
+        let tail_weight_multiplier = 1.5;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
         let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length, tail_weight_multiplier);
         let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, &corners2, std::cmp::min(tail_tangent_n, smooth_curve2_len), base_length, tail_weight_multiplier);
 
-        let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
-        draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
-        draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
+        if self.display_tangents {
+            let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
+            draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
+            draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
+        }
         
         //# Curve interpolation
         let smoothness = 100;

@@ -1,4 +1,4 @@
-import { Repairer } from "image-repair";
+import { DisplaySelector, Repairer } from "image-repair";
 
 export class DrawingCanvas {
     canvas: HTMLCanvasElement;
@@ -31,6 +31,8 @@ export class DrawingCanvas {
         let img = new Image();
         return new Promise<void>( (resolve, reject) => {
             img.onload = () => {
+                this.canvas.width = img.width;
+                this.canvas.height = img.height;
                 this.ctx.drawImage(img, 0, 0);
                 resolve();
             };
@@ -53,11 +55,11 @@ export class DrawingCanvas {
         this.ctx.fill();
     }
 
-    process() {
+    process(displaySelector: DisplaySelector, displayTangents: boolean) {
         if (typeof this.holeRect === typeof undefined) {
             throw new Error("There is no hole defined for this canvas!");
         }
-        const repairer = new Repairer(this.ctx.canvas.id, this.holeRect.x, this.holeRect.y, this.holeRect.w, this.holeRect.h);
+        const repairer = new Repairer(this.ctx.canvas.id, displaySelector, displayTangents, this.holeRect.x, this.holeRect.y, this.holeRect.w, this.holeRect.h);
         repairer.repair();
         repairer.free();
     }
