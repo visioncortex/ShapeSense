@@ -1,4 +1,6 @@
-use visioncortex::PointF64;
+use std::f64::consts::PI;
+
+use visioncortex::{PathF64, PointF64};
 
 // Geometry helper functions
 
@@ -36,6 +38,62 @@ pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: Poin
     let x = (B2 * C1 - B1 * C2) / determinant;
     let y = (A1 * C2 - A2 * C1) / determinant;
     PointF64::new(x, y)
+}
+
+/// Find the inclined angle of a point in (-pi, pi].
+pub fn angle_of_point(p: &PointF64) -> f64 {
+    if p.y.is_sign_negative() {
+        -p.x.acos()
+    } else {
+        p.x.acos()
+    }
+}
+
+/// Given two ordered angles in (-pi,pi], find the signed angle difference between them.
+/// Positive in clockwise direction, the 0-degree axis is the positive x axis
+pub fn signed_angle_difference(from: &f64, to: &f64) -> f64 {
+    let v1 = *from;
+    let mut v2 = *to;
+    if v1 > v2 {
+        v2 += 2.0 * PI;
+    }
+
+    let diff = v2 - v1;
+    if diff > PI {
+        diff - 2.0 * PI
+    } else {
+        diff
+    }
+}
+
+/// Takes a path representing an arbitrary curve, returns a vector of bool representing its corners
+/// (angle in radians bigger or equal to than 'threshold').
+pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
+    if path.is_empty() {
+        return vec![];
+    }
+    
+    let path = path.to_unclosed();
+    let len = path.len();
+
+    let mut corners: Vec<bool> = vec![false; len];
+    for i in 1..(len-1) {
+        let prev = i-1;
+        let next = i+1;
+
+        let v1 = path[i] - path[prev];
+        let v2 = path[next] - path[i];
+
+        let angle_v1 = angle_of_point(&v1.get_normalized());
+        let angle_v2 = angle_of_point(&v2.get_normalized());
+
+        let angle_diff = signed_angle_difference(&angle_v1, &angle_v2).abs();
+        if angle_diff >= threshold {
+            corners[i] = true;
+        }
+    }
+    
+    corners
 }
 
 /// Finds mid-points between (p_i and p_j) and (p_1 and p_2), where p_i and p_j should be between p_1 and p_2,

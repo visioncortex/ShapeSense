@@ -18,7 +18,7 @@ function createHTMLCanvasElement(canvasId: string) {
     document.getElementById("canvasDiv").appendChild(span);
 }
 
-testInputs.forEach( (testInput, i) => {
+let statuses = testInputs.map( (testInput, i) => {
     console.groupCollapsed(testInput.canvasId);
 
     createHTMLCanvasElement(testInput.canvasId);
@@ -33,15 +33,23 @@ testInputs.forEach( (testInput, i) => {
     testCanvas.drawForeground();
 
     testCanvas.holeRect = testInput.holeRect;
+
+    let status: {canvasId: string, success: boolean};
     
     try {
         testCanvas.process();
-        console.log("%c Test " + testInput.canvasId + " has no errors!", "color: #00FF00");
+        status = {canvasId: testInput.canvasId, success: true};
     } catch (e) {
         console.error(e);
-        console.log("%c Test " + testInput.canvasId + " failed!", "color: #FF0000");
+        status = {canvasId: testInput.canvasId, success: false};
     }
 
     console.groupEnd();
-    return testCanvas;
+    return status;
+});
+
+statuses.forEach((status) => {
+    if (!status.success) {
+        console.log("%c Test " + status.canvasId + " failed!", "color: #FF0000");
+    }
 });

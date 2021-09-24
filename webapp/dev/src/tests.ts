@@ -67,7 +67,7 @@ export const testInputs: Array<TestInput> = [
     },
     {
         canvasId: "rectangle middle left (1)",
-        holeRect: {x: 10, y: 100, w: 70, h: 70},
+        holeRect: {x: 10, y: 60, w: 70, h: 70},
         drawForeground:(canvas) => {
             canvas.ctx.fillStyle = "#FF0000";
             canvas.ctx.fillRect(40, 40, 120, 220);

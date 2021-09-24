@@ -9,7 +9,7 @@ use super::util::{angle, find_intersection, find_mid_point, norm, normalize, sig
 impl SubdivideSmooth {
 
     /// Takes a path forming a polygon, returns a vector of bool representing its corners 
-    /// (angle in radians bigger than threshold).
+    /// (angle in radians bigger than or equal to threshold).
     /// 
     /// Note that the length of output is 1 less than that of the original path,
     /// because the last point of the original path is always equal to the first point for paths of walked polygons (closed path)

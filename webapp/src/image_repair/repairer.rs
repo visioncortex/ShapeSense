@@ -3,7 +3,7 @@ use flo_curves::{BezierCurve, BezierCurveFactory, bezier};
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
-use crate::{image_repair::{calculate_intersection, calculate_midpoint, find_new_point_from_4_point_scheme}, util::console_log_util};
+use crate::{image_repair::{calculate_intersection, calculate_midpoint, find_corners, find_new_point_from_4_point_scheme}, util::console_log_util};
 
 use super::draw::DrawUtil;
 
@@ -270,10 +270,11 @@ impl Repairer {
         //# Curve smoothing
         let outset_ratio = 8.0;
         let min_segment_length = 4.0;
-        let max_iterations = 5;
+        let max_iterations = 2;
+        let corner_threshold = std::f64::consts::FRAC_PI_2;
 
-        let smooth_curve1 = Self::smoothen_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations);
-        let smooth_curve2 = Self::smoothen_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations);
+        let (smooth_curve1, corners1) = Self::smoothen_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
+        let (smooth_curve2, corners2) = Self::smoothen_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
 
         draw_util.draw_path_f64(&color1, &smooth_curve1);
         draw_util.draw_path_f64(&color2, &smooth_curve2);
@@ -281,8 +282,8 @@ impl Repairer {
         //# Tail tangent approximation
         let tail_tangent_n = 5;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
-        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length);
-        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, std::cmp::min(tail_tangent_n, smooth_curve2_len), base_length);
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length);
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, &corners2, std::cmp::min(tail_tangent_n, smooth_curve2_len), base_length);
 
         let tangent_visual_length = 20.0;
         draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
@@ -296,17 +297,20 @@ impl Repairer {
 
 // Helper functions
 impl Repairer {
-    /// Apply the 4-point scheme subdivision on 'path' in a convolutional manner iteratively.
+    /// Apply the 4-point scheme subdivision on 'path' in a convolutional manner iteratively, preserving corners.
+    /// The corners of the smoothed path are returned as a bool mask.
     /// Segments (at any point during iteration) shorter than 'min_segment_length' are not further subdivided.
     /// If no subdivision is performed, the iterative process is terminated early.
     /// 'path' is returned as-is if path.len() < 4
-    fn smoothen_open_curve_iterative(mut path: PathF64, outset_ratio: f64, min_segment_length: f64, max_iterations: usize) -> PathF64 {
+    fn smoothen_open_curve_iterative(mut path: PathF64, outset_ratio: f64, min_segment_length: f64, max_iterations: usize, corner_threshold: f64) -> (PathF64, Vec<bool>) {
+        let mut corners = find_corners(&path, corner_threshold);
+
         if path.len() < 4  {
-            return path;
+            return (path, corners);
         }
         
         for _ in 0..max_iterations {
-            let can_terminate_early = Self::smoothen_open_curve_step(&mut path, outset_ratio, min_segment_length);
+            let can_terminate_early = Self::smoothen_open_curve_step(&mut path, &mut corners, outset_ratio, min_segment_length);
 
             // Early termination
             if can_terminate_early {
@@ -314,45 +318,58 @@ impl Repairer {
             }
         }
 
-        path
+        (path, corners)
     }
 
     /// Return true if no subdivision is done in this step.
-    fn smoothen_open_curve_step(path: &mut PathF64, outset_ratio: f64, min_segment_length: f64) -> bool {
+    fn smoothen_open_curve_step(path: &mut PathF64, corners: &mut Vec<bool>, outset_ratio: f64, min_segment_length: f64) -> bool {
         let mut new_points = vec![path[0]];
+        let mut new_corners = vec![corners[0]];
 
         // Duplicate the last point to make sure all segments except the first are subdivided
         path.add(path[path.len()-1]);
 
         // Apply 4-point scheme on 'path' in a convolutional manner
-        for points in path.path.windows(4) {
+        for (i, points) in path.path.windows(4).enumerate() {
             new_points.push(points[1]);
+            new_corners.push(corners[i+1]);
+
+            // Do not smooth out corners
+            if corners[i+1] || corners[i+2] {
+                continue;
+            }
 
             // Threshold on segment length of the segment to be broken down
             let checked_segment_length = (points[1] - points[2]).norm();
             if checked_segment_length >= min_segment_length {
                 new_points.push(find_new_point_from_4_point_scheme(
                     &points[1], &points[2], &points[0], &points[3], outset_ratio));
+                new_corners.push(false); // New point must be a non-corner during subdivision
             }    
         }
 
         // Push the original last point
         new_points.extend(path.iter().rev().take(1));
+        new_corners.push(corners[corners.len()-1]);
+
+        assert_eq!(new_points.len(), new_corners.len());
 
         if new_points.len() == path.len() { // no additional points after this step
             true
         } else {
             *path = PathF64::from_points(new_points);
+            *corners = new_corners;
             false
         }
     }
     
     /// Calculate the weighted average tangent vector at the tail of 'path'.
-    /// Either the last 'n' points, or the most number of points at the tail such that the sum of segment
-    /// lengths is at most base_length are taken into account.
+    /// Either the last 'n' points, the most number of points at the tail such that the sum of segment
+    /// lengths is at most base_length, or the last points until a corner is seen, whichever is the smallest,
+    /// are taken into account.
     /// The weights are stronger towards the tail.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
-    fn calculate_weighted_average_tangent_at_tail(path: PathF64, n: usize, base_length: f64) -> PointF64 {
+    fn calculate_weighted_average_tangent_at_tail(path: PathF64, corners: &[bool], n: usize, base_length: f64) -> PointF64 {
         let len = path.len();
         assert!(1 < n);
         assert!(n <= len);
@@ -360,7 +377,13 @@ impl Repairer {
         let mut tangent_acc = PointF64::default();
         let mut length_acc = 0.0;
         let rev_points: Vec<PointF64> = path.path.into_iter().rev().take(n).collect();
-        for point_pair in rev_points.windows(2) {
+        let rev_corners: Vec<&bool> = corners.iter().rev().take(n).collect();
+        for (i, point_pair) in rev_points.windows(2).enumerate() {
+            // Stop at first corner from tail
+            if *rev_corners[i] {
+                break;
+            }
+
             let (from, to) = (point_pair[1], point_pair[0]);
             let from_to = to - from;
             tangent_acc *= 2.0; // Stronger weights towards the tail (multiplied more times)
