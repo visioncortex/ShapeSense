@@ -60,7 +60,7 @@ switch (document.body.id) {
         await originalCanvas.loadImage(`./assets/${document.body.id}.png`);
 }
 
-Promise.all(testInputs.map( async (testInput, i) => {
+const statusPromiseFactories = testInputs.map( (testInput, i) => async () => {
     console.groupCollapsed(testInput.canvasId);
 
     createHTMLCanvasElement(testInput.canvasId, i);
@@ -88,14 +88,23 @@ Promise.all(testInputs.map( async (testInput, i) => {
     let status = process(testCanvas, testInput);
     console.groupEnd();
     return status;
-}))
-.then((statuses) => {
-    statuses.forEach((status) => {
-        if (!status.success) {
-            console.log("%c Test " + status.canvasId + " failed!", "color: #FF0000");
-        }
-    });
 });
+
+const dummyPromise = Promise.resolve({canvasId: "", success: true});
+statusPromiseFactories.push(() => dummyPromise);
+
+statusPromiseFactories.reduce(
+    async (promise, factory) => {
+        return promise.then(
+            (status) => {
+                if (!status.success) {
+                    console.log("%c Test " + status.canvasId + " failed!", "color: #FF0000");
+                }
+                return factory();
+            });
+        },
+    dummyPromise
+);
 
 } // End of run()
 
