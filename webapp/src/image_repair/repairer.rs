@@ -3,7 +3,7 @@ use flo_curves::{BezierCurve, BezierCurveFactory, bezier};
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
-use crate::util::console_log_util;
+use crate::{image_repair::{calculate_intersection, calculate_midpoint, find_new_point_from_4_point_scheme}, util::console_log_util};
 
 use super::draw::DrawUtil;
 
@@ -14,6 +14,7 @@ pub struct Repairer {
     hole_rect: BoundingRect,
 }
 
+// WASM API
 #[wasm_bindgen]
 impl Repairer {
     #[wasm_bindgen(constructor)]
@@ -83,6 +84,7 @@ impl Repairer {
     }
 }
 
+// Test-specific helper functions
 impl Repairer {
     fn get_paths(&self) -> Vec<PathI32> {
         // Clustering
@@ -235,6 +237,7 @@ impl Repairer {
     }
 }
 
+// API
 impl Repairer {
     /// Interpolate the imaginary curve between two existing curves.
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
@@ -291,6 +294,7 @@ impl Repairer {
     }
 }
 
+// Helper functions
 impl Repairer {
     /// Apply the 4-point scheme subdivision on 'path' in a convolutional manner iteratively.
     /// Segments (at any point during iteration) shorter than 'min_segment_length' are not further subdivided.
@@ -327,7 +331,7 @@ impl Repairer {
             // Threshold on segment length of the segment to be broken down
             let checked_segment_length = (points[1] - points[2]).norm();
             if checked_segment_length >= min_segment_length {
-                new_points.push(Self::find_new_point_from_4_point_scheme(
+                new_points.push(find_new_point_from_4_point_scheme(
                     &points[1], &points[2], &points[0], &points[3], outset_ratio));
             }    
         }
@@ -341,24 +345,6 @@ impl Repairer {
             *path = PathF64::from_points(new_points);
             false
         }
-    }
-
-    /// Finds mid-points between (p_i and p_j) and (p_1 and p_2), where p_i and p_j should be between p_1 and p_2,
-    /// then returns the new point constructed by the 4-point scheme
-    fn find_new_point_from_4_point_scheme(
-        p_i: &PointF64, p_j: &PointF64, p_1: &PointF64, p_2: &PointF64, outset_ratio: f64) -> PointF64 {
-        let mid_out = Self::calculate_midpoint(*p_i, *p_j);
-        let mid_in = Self::calculate_midpoint(*p_1, *p_2);
-
-        let vector_out = mid_out - mid_in;
-        let new_magnitude = vector_out.norm() / outset_ratio;
-        if new_magnitude < 1e-5 {
-            // mid_out == mid_in in this case
-            return mid_out;
-        }
-
-        // Point out from mid_out
-        mid_out + vector_out.get_normalized() * new_magnitude
     }
     
     /// Calculate the weighted average tangent vector at the tail of 'path'.
@@ -389,53 +375,17 @@ impl Repairer {
         tangent_acc.get_normalized()
     }
 
-    fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
-        p1 * 0.5 + p2 * 0.5
-    }
-
-    // Given lines p1p2 and p3p4, returns their intersection.
-    // If the two lines coincide, returns the mid-pt of p1 and p4.
-    // If the two lines are parallel, also returns the mid-pt of p1 and p4.
-    #[allow(non_snake_case)]
-    fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> PointF64 {
-        // Find the equation of a straight line defined by 2 points in the form of Ax + By = C.
-        let find_line_equation = |a: &PointF64, b: &PointF64| {
-            let A = -(a.y - b.y);
-            let B = a.x - b.x;
-            let C = a.y * (a.x - b.x) - a.x * (a.y - b.y);
-            (A, B, C)
-        };
-
-        let f64_approximately = |a: f64, b: f64| { (a - b).abs() <= 1e-7 };
-    
-        let (A1, B1, C1) = find_line_equation(&p1, &p2);
-        let (A2, B2, C2) = find_line_equation(&p3, &p4);
-
-        if f64_approximately(A1/A2, B1/B2) && f64_approximately(B1/B2, C1/C2) {
-            return Self::calculate_midpoint(p1, p4);
-        }
-
-        let determinant = A1 * B2 - A2 * B1;
-        if f64_approximately(determinant, 0.0) {
-            return Self::calculate_midpoint(p1, p4);
-        }
-
-        let x = (B2 * C1 - B1 * C2) / determinant;
-        let y = (A1 * C2 - A2 * C1) / determinant;
-        PointF64::new(x, y)
-    }
-
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     fn calculate_cubic_curve(from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
         let scaled_base_length = (from_point - to_point).norm() * 2.0;    
-        let intersection = Self::calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+        let intersection = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
 
         let length_from_and_intersection = (from_point - intersection).norm();
         let length_to_and_intersection = (to_point - intersection).norm();
 
         let evaluate_control_point = |point: PointF64, tangent:PointF64, length_with_intersection: f64| {
             if scaled_base_length > length_with_intersection * 0.5 {
-                Self::calculate_midpoint(point, intersection)
+                calculate_midpoint(point, intersection)
             } else {
                 point + tangent.get_normalized() * scaled_base_length
             }
