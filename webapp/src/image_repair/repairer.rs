@@ -311,7 +311,7 @@ impl Repairer {
         
         //# Curve interpolation
         let smoothness = 100;
-        Self::calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness)
+        self.calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness)
     }
 }
 
@@ -419,7 +419,7 @@ impl Repairer {
     }
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
-    fn calculate_cubic_curve(from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
+    fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;    
         let intersection = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
 
@@ -427,11 +427,19 @@ impl Repairer {
         let length_to_and_intersection = to_point.distance_to(intersection);
 
         let evaluate_control_point = |point: PointF64, tangent:PointF64, length_with_intersection: f64| {
+            let mut control_point;
+
             if scaled_base_length > length_with_intersection * 0.5 {
-                calculate_midpoint(point, intersection)
+                control_point = calculate_midpoint(point, intersection)
             } else {
-                point + tangent.get_normalized() * scaled_base_length
+                control_point = point + tangent.get_normalized() * scaled_base_length
             }
+
+            while !self.hole_rect.have_point_inside(control_point.to_point_i32()) {
+                control_point = calculate_midpoint(point, control_point);
+            }
+
+            control_point
         };
         let control_point1 = evaluate_control_point(from_point, from_tangent, length_from_and_intersection);
         let control_point2 = evaluate_control_point(to_point, to_tangent, length_to_and_intersection);
