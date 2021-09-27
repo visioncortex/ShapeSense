@@ -1,4 +1,6 @@
-use visioncortex::{Color, PathF64, PathI32, PointF64, PointI32};
+use std::convert::TryInto;
+
+use visioncortex::{Color, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
 use web_sys::CanvasRenderingContext2d;
 
 use crate::canvas::Canvas;
@@ -66,6 +68,13 @@ impl DrawUtil {
         ctx.stroke();
     }
 
+    pub fn draw_spline(&self, color: &Color, spline: &Spline) {
+        let control_points_iter = spline.iter().as_slice().windows(4).step_by(3);
+        for control_points in control_points_iter {
+            self.draw_cubic_bezier_curve(color, control_points.try_into().expect("Control points must have 4 elements"));
+        }
+    }
+
     pub fn draw_cubic_bezier_curve(&self, color: &Color, control_points: [PointF64; 4]) {
         let ctx = self.ctx();
         ctx.set_stroke_style(&color.to_hex_string().into());
@@ -78,5 +87,15 @@ impl DrawUtil {
             control_points[3].x, control_points[3].y,
         );
         ctx.stroke();
+    }
+
+    pub fn draw_compound_path(&self, color: &Color, compound_path: &CompoundPath) {
+        for path in compound_path.iter() {
+            match path {
+                visioncortex::CompoundPathElement::PathI32(path) => self.draw_path_i32(color, path),
+                visioncortex::CompoundPathElement::PathF64(path) => self.draw_path_f64(color, path),
+                visioncortex::CompoundPathElement::Spline(spline) => self.draw_spline(color, spline),
+            }
+        }
     }
 }

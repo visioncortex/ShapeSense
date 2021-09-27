@@ -12,8 +12,8 @@ pub fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
     p1 * 0.5 + p2 * 0.5
 }
 
-// Given a line p1p2, returns its unit normal.
-// Note that the returned vector and its negative are both unit normals of p1p2.
+// Given a line p1p2, returns its unit normal at right hand side.
+// Note that the negative of the returned vector is the unit normal at left hand side.
 pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
     let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
     PointF64::new(-dy, dx).get_normalized()
@@ -22,7 +22,6 @@ pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
 // Given directed lines p1p2 and p3p4, returns their intersection only if it is in the positive direction.
 // If the two lines coincide or are parallel, returns the mid-pt of p2 and p3.
 // If the intersection of the lines is not in the positive direction, returns none.
-// #[allow(non_snake_case)]
 pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> Option<PointF64> {
     let extract_coords = |p: &PointF64| {(p.x, p.y)};
     let (x1, y1) = extract_coords(&p1);

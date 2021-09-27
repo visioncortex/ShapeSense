@@ -183,6 +183,38 @@ shapeTestInputs.set("shape2", [
 shapeTestInputs.set("shape3", [
     {
         canvasId: "top left",
-        holeRect: {x: 65, y: 55, w: 40, h: 40},
+        holeRect: {x: 45, y: 15, w: 40, h: 40},
+    },
+    {
+        canvasId: "top center",
+        holeRect: {x: 60, y: 15, w: 40, h: 40},
+    },
+    {
+        canvasId: "top right",
+        holeRect: {x: 90, y: 35, w: 40, h: 40},
+    },
+    {
+        canvasId: "middle left",
+        holeRect: {x: 15, y: 65, w: 40, h: 40},
+    },
+    {
+        canvasId: "random",
+        holeRect: {x: 105, y: 45, w: 40, h: 40},
+    },
+    {
+        canvasId: "middle right",
+        holeRect: {x: 105, y: 85, w: 40, h: 40},
+    },
+    {
+        canvasId: "bottom left",
+        holeRect: {x: 10, y: 130, w: 40, h: 40},
+    },
+    {
+        canvasId: "bottom center",
+        holeRect: {x: 50, y: 140, w: 40, h: 40},
+    },
+    {
+        canvasId: "bottom right",
+        holeRect: {x: 80, y: 140, w: 40, h: 40},
     },
 ]);

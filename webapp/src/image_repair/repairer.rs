@@ -1,6 +1,5 @@
 use bit_vec::BitVec;
-use flo_curves::{BezierCurve, BezierCurveFactory, bezier};
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointF64, PointI32, color_clusters::{Runner, RunnerConfig}};
+use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{calculate_intersection, calculate_midpoint, find_corners, find_new_point_from_4_point_scheme}, util::console_log_util};
@@ -93,7 +92,7 @@ impl Repairer {
 
         let interpolated_curve = self.interpolate_curve_between_curves(curve1.to_path_f64(), curve2.to_path_f64(), true, true, &self.draw_util);
         
-        self.draw_util.draw_path_f64(&Color::get_palette_color(4), &interpolated_curve);
+        self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
     }
 }
 
@@ -256,7 +255,7 @@ impl Repairer {
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, draw_util: &DrawUtil) -> PathF64 {
+    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, draw_util: &DrawUtil) -> CompoundPath {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -310,8 +309,7 @@ impl Repairer {
         }
         
         //# Curve interpolation
-        let smoothness = 100;
-        self.calculate_whole_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness)
+        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2)
     }
 }
 
@@ -418,11 +416,15 @@ impl Repairer {
         tangent_acc.get_normalized()
     }
 
-    fn calculate_whole_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
+    fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64) -> CompoundPath {
         let intersection_option = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+        let mut compound_path = CompoundPath::new();
+
         if intersection_option.is_some() {
             // Only 1 big part
-            self.calculate_part_cubic_curve(from_point, from_tangent, to_point, to_tangent, smoothness, intersection_option)
+            compound_path.add_spline(
+                self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, intersection_option)
+            );
         } else {
             // S-shape detected
             // Divide into 2 parts and concatenate
@@ -431,17 +433,20 @@ impl Repairer {
             // Determine the normal to use (+/-) based on the side of the tangents
             let from_side_normal = if from_tangent.dot(normal) > 0.0 {normal} else {-normal};
             let to_side_normal = -from_side_normal;
-            // Calculate the two parts of the curve
-            let from_side_curve = self.calculate_part_cubic_curve(from_point, from_tangent, mid_point, from_side_normal, smoothness >> 1, intersection_option);
-            let to_side_curve = self.calculate_part_cubic_curve(to_point, to_tangent, mid_point, to_side_normal, smoothness >> 1, intersection_option);
+            // Calculate the two parts of the curve, recalculating the intersections
+            let from_side_curve = self.calculate_part_curve(from_point, from_tangent, mid_point, from_side_normal, None);
+            let to_side_curve = self.calculate_part_curve(mid_point, to_side_normal, to_point, to_tangent, None);
 
-            let all_points_iter = from_side_curve.iter().chain(to_side_curve.iter().rev()).copied();
-            PathF64::from_points(all_points_iter.collect())
+            compound_path.add_spline(from_side_curve);
+            compound_path.add_spline(to_side_curve);
         }
+
+        compound_path
     }
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
-    fn calculate_part_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize, intersection_option: Option<PointF64>) -> PathF64 {
+    /// 'intersection_option' is only to avoid unnecessary recalculation.
+    fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>) -> Spline {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;
         // Take or recalculate
         let intersection = if let Some(intersection) = intersection_option { intersection }
@@ -470,25 +475,8 @@ impl Repairer {
         let control_point1 = evaluate_control_point(from_point, from_tangent, length_from_and_intersection);
         let control_point2 = evaluate_control_point(to_point, to_tangent, length_to_and_intersection);
         
-        let curve = bezier::Curve::from_points(
-            from_point,
-            (control_point1, control_point2),
-            to_point
-        );
-        
-        let points: Vec<PointF64> = (0..=smoothness)
-                                        .into_iter()
-                                        .filter_map(|i| {
-                                            let t = i as f64 / smoothness as f64;
-                                            let point = curve.point_at_pos(t);
-                                            if self.hole_rect.have_point_on_boundary_or_inside(point.to_point_i32()) {
-                                                Some(point)
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        .collect();
-
-        PathF64::from_points(points)
+        let mut spline = Spline::new(from_point);
+        spline.add(control_point1, control_point2, to_point);
+        spline
     }
 }
