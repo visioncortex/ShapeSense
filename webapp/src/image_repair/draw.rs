@@ -41,6 +41,10 @@ impl DrawUtil {
     }
 
     pub fn draw_path_f64(&self, color: &Color, path: &PathF64) {
+        if path.is_empty() {
+            return;
+        }
+        
         let ctx = self.ctx();
         ctx.set_stroke_style(&color.to_hex_string().into());
 

@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{calculate_intersection, calculate_midpoint, find_corners, find_new_point_from_4_point_scheme}, util::console_log_util};
 
-use super::draw::DrawUtil;
+use super::{calculate_unit_normal_of_line, draw::DrawUtil};
 
 #[wasm_bindgen]
 #[derive(PartialEq)]
@@ -288,8 +288,8 @@ impl Repairer {
         let max_iterations = 2;
         let corner_threshold = std::f64::consts::FRAC_PI_2;
 
-        let (smooth_curve1, corners1) = Self::smoothen_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
-        let (smooth_curve2, corners2) = Self::smoothen_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
+        let (smooth_curve1, corners1) = Self::smooth_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
+        let (smooth_curve2, corners2) = Self::smooth_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
 
         if self.display_selector == DisplaySelector::Smoothed {
             draw_util.draw_path_f64(&color1, &smooth_curve1);
@@ -297,7 +297,7 @@ impl Repairer {
         }
 
         //# Tail tangent approximation
-        let tail_tangent_n = 8;
+        let tail_tangent_n = 5;
         let tail_weight_multiplier = 1.5;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
         let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n, smooth_curve1_len), base_length, tail_weight_multiplier);
@@ -311,7 +311,7 @@ impl Repairer {
         
         //# Curve interpolation
         let smoothness = 100;
-        self.calculate_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness)
+        self.calculate_whole_cubic_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, smoothness)
     }
 }
 
@@ -322,7 +322,7 @@ impl Repairer {
     /// Segments (at any point during iteration) shorter than 'min_segment_length' are not further subdivided.
     /// If no subdivision is performed, the iterative process is terminated early.
     /// 'path' is returned as-is if path.len() < 4
-    fn smoothen_open_curve_iterative(mut path: PathF64, outset_ratio: f64, min_segment_length: f64, max_iterations: usize, corner_threshold: f64) -> (PathF64, Vec<bool>) {
+    fn smooth_open_curve_iterative(mut path: PathF64, outset_ratio: f64, min_segment_length: f64, max_iterations: usize, corner_threshold: f64) -> (PathF64, Vec<bool>) {
         let mut corners = find_corners(&path, corner_threshold);
 
         if path.len() < 4  {
@@ -330,7 +330,7 @@ impl Repairer {
         }
         
         for _ in 0..max_iterations {
-            let can_terminate_early = Self::smoothen_open_curve_step(&mut path, &mut corners, outset_ratio, min_segment_length);
+            let can_terminate_early = Self::smooth_open_curve_step(&mut path, &mut corners, outset_ratio, min_segment_length);
 
             // Early termination
             if can_terminate_early {
@@ -342,7 +342,7 @@ impl Repairer {
     }
 
     /// Return true if no subdivision is done in this step.
-    fn smoothen_open_curve_step(path: &mut PathF64, corners: &mut Vec<bool>, outset_ratio: f64, min_segment_length: f64) -> bool {
+    fn smooth_open_curve_step(path: &mut PathF64, corners: &mut Vec<bool>, outset_ratio: f64, min_segment_length: f64) -> bool {
         let mut new_points = vec![path[0]];
         let mut new_corners = vec![corners[0]];
 
@@ -418,10 +418,34 @@ impl Repairer {
         tangent_acc.get_normalized()
     }
 
+    fn calculate_whole_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
+        let intersection_option = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+        if intersection_option.is_some() {
+            // Only 1 big part
+            self.calculate_part_cubic_curve(from_point, from_tangent, to_point, to_tangent, smoothness, intersection_option)
+        } else {
+            // S-shape detected
+            // Divide into 2 parts and concatenate
+            let mid_point = calculate_midpoint(from_point, to_point);
+            let normal = calculate_unit_normal_of_line(from_point, to_point);
+            // Determine the normal to use (+/-) based on the side of the tangents
+            let from_side_normal = if from_tangent.dot(normal) > 0.0 {normal} else {-normal};
+            let to_side_normal = -from_side_normal;
+            // Calculate the two parts of the curve
+            let from_side_curve = self.calculate_part_cubic_curve(from_point, from_tangent, mid_point, from_side_normal, smoothness >> 1, intersection_option);
+            let to_side_curve = self.calculate_part_cubic_curve(to_point, to_tangent, mid_point, to_side_normal, smoothness >> 1, intersection_option);
+
+            let all_points_iter = from_side_curve.iter().chain(to_side_curve.iter().rev()).copied();
+            PathF64::from_points(all_points_iter.collect())
+        }
+    }
+
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
-    fn calculate_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize) -> PathF64 {
-        let scaled_base_length = from_point.distance_to(to_point) * 2.0;    
-        let intersection = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+    fn calculate_part_cubic_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, smoothness: usize, intersection_option: Option<PointF64>) -> PathF64 {
+        let scaled_base_length = from_point.distance_to(to_point) * 2.0;
+        // Take or recalculate
+        let intersection = if let Some(intersection) = intersection_option { intersection }
+                           else { calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent).unwrap() };
 
         let length_from_and_intersection = from_point.distance_to(intersection);
         let length_to_and_intersection = to_point.distance_to(intersection);
@@ -435,8 +459,10 @@ impl Repairer {
                 control_point = point + tangent.get_normalized() * scaled_base_length
             }
 
-            while !self.hole_rect.have_point_inside(control_point.to_point_i32()) {
+            let mut i: usize = 100; // Limit the number of iterations
+            while !self.hole_rect.have_point_on_boundary_or_inside(control_point.to_point_i32()) && i > 0 {
                 control_point = calculate_midpoint(point, control_point);
+                i -= 1;
             }
 
             control_point
@@ -452,9 +478,14 @@ impl Repairer {
         
         let points: Vec<PointF64> = (0..=smoothness)
                                         .into_iter()
-                                        .map(|i| {
+                                        .filter_map(|i| {
                                             let t = i as f64 / smoothness as f64;
-                                            curve.point_at_pos(t)
+                                            let point = curve.point_at_pos(t);
+                                            if self.hole_rect.have_point_on_boundary_or_inside(point.to_point_i32()) {
+                                                Some(point)
+                                            } else {
+                                                None
+                                            }
                                         })
                                         .collect();
 

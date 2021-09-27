@@ -4,40 +4,53 @@ use visioncortex::{PathF64, PointF64};
 
 // Geometry helper functions
 
+fn f64_approximately(a: f64, b: f64) -> bool {
+    (a - b).abs() <= f64::EPSILON
+}
+
 pub fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
     p1 * 0.5 + p2 * 0.5
 }
 
-// Given lines p1p2 and p3p4, returns their intersection.
-// If the two lines coincide, returns the mid-pt of p1 and p4.
-// If the two lines are parallel, also returns the mid-pt of p1 and p4.
-#[allow(non_snake_case)]
-pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> PointF64 {
-    // Find the equation of a straight line defined by 2 points in the form of Ax + By = C.
-    let find_line_equation = |a: &PointF64, b: &PointF64| {
-        let A = -(a.y - b.y);
-        let B = a.x - b.x;
-        let C = a.y * (a.x - b.x) - a.x * (a.y - b.y);
-        (A, B, C)
-    };
+// Given a line p1p2, returns its unit normal.
+// Note that the returned vector and its negative are both unit normals of p1p2.
+pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
+    let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
+    PointF64::new(-dy, dx).get_normalized()
+}
 
-    let f64_approximately = |a: f64, b: f64| { (a - b).abs() <= 1e-7 };
+// Given directed lines p1p2 and p3p4, returns their intersection only if it is in the positive direction.
+// If the two lines coincide or are parallel, returns the mid-pt of p2 and p3.
+// If the intersection of the lines is not in the positive direction, returns none.
+// #[allow(non_snake_case)]
+pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> Option<PointF64> {
+    let extract_coords = |p: &PointF64| {(p.x, p.y)};
+    let (x1, y1) = extract_coords(&p1);
+    let (x2, y2) = extract_coords(&p2);
+    let (x3, y3) = extract_coords(&p3);
+    let (x4, y4) = extract_coords(&p4);
 
-    let (A1, B1, C1) = find_line_equation(&p1, &p2);
-    let (A2, B2, C2) = find_line_equation(&p3, &p4);
-
-    if f64_approximately(A1/A2, B1/B2) && f64_approximately(B1/B2, C1/C2) {
-        return calculate_midpoint(p1, p4);
+    // Calculate u_a and u_b
+    // u_a parametrizes p1p2 and u_b parametrizes p3p4
+    let denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+    if f64_approximately(denom, 0.0) { // Parallel check
+        return Some(calculate_midpoint(p2, p3));
     }
-
-    let determinant = A1 * B2 - A2 * B1;
-    if f64_approximately(determinant, 0.0) {
-        return calculate_midpoint(p1, p4);
+    let numera_a = (x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3);
+    let numera_b = (x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3);
+    // All of denom, numera_a and numera_b are 0
+    if f64_approximately(denom + numera_a + numera_b, 0.0) { // Coincidence check
+        return Some(calculate_midpoint(p2, p3));
     }
+    let u_a = numera_a / denom;
+    let u_b = numera_b / denom;
 
-    let x = (B2 * C1 - B1 * C2) / determinant;
-    let y = (A1 * C2 - A2 * C1) / determinant;
-    PointF64::new(x, y)
+    // Positive direction check
+    if u_a.is_sign_positive() && u_b.is_sign_positive() {
+        Some(PointF64::new(x1 + u_a * (x2 - x1), y1 + u_a * (y2 - y1)))
+    } else {
+        None
+    }    
 }
 
 /// Find the inclined angle of a point in (-pi, pi].

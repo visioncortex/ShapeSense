@@ -81,10 +81,9 @@ const statusPromiseFactories = testInputs.map( (testInput, i) => async () => {
         testCanvas.drawForeground = () => (testInput as IndexTestInput).drawForeground(testCanvas);
     }
 
-    let src = (testInput as FileTestInput)?.src;
-    if (src) {
+    if (document.body.id !== "index") {
         try {
-            await testCanvas.loadImage(src);
+            await testCanvas.loadImage(`./assets/shape${document.body.id}.png`);
         } catch(e) {
             console.groupEnd();
             return {canvasId: testInput.canvasId, success: false};
