@@ -48,11 +48,11 @@ impl Repairer {
         //# Path identification, segmentation, and simplification
         let simplify_tolerance = 2.0;
         let path_segments: Vec<PathI32> = paths.into_iter()
-                                 .map(|path| {
-                                    self.find_segments_on_path(path, simplify_tolerance)
-                                 })
-                                 .flatten()
-                                 .collect();
+                                               .map(|path| {
+                                                   self.find_segments_on_path(path, simplify_tolerance)
+                                               })
+                                               .flatten()
+                                               .collect();
 
         //# Matching paths
         let direction_difference_threshold = 0.15;

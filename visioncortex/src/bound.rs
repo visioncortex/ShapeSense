@@ -192,10 +192,10 @@ impl BoundingRect {
 
     pub fn have_point_on_boundary(&self, p: PointI32) -> bool {
         // On left or right bounds
-        (p.x == self.left || p.x == self.right) && (self.top <= p.y && p.y <= self.bottom)
+        (p.x == self.left || p.x == self.right) && (self.top-1 <= p.y && p.y <= self.bottom+1)
             ||
         // On top or bottom bounds
-        (p.y == self.top || p.y == self.bottom) && (self.left <= p.x && p.x <= self.right)
+        (p.y == self.top || p.y == self.bottom) && (self.left-1 <= p.x && p.x <= self.right+1)
     }
 
     pub fn have_point_inside(&self, p: PointI32) -> bool {
