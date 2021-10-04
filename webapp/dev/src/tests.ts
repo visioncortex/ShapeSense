@@ -230,3 +230,46 @@ shapeTestInputs.set("shape3", [
         holeRect: {x: 80, y: 140, w: 40, h: 40},
     },
 ]);
+
+shapeTestInputs.set("shape4", [
+    {
+        canvasId: "top left",
+        holeRect: {x: 35, y: 35, w: 60, h: 60},
+    },
+    {
+        canvasId: "top center",
+        holeRect: {x: 75, y: 25, w: 80, h: 60},
+    },
+    {
+        canvasId: "top right",
+        holeRect: {x: 135, y: 35, w: 60, h: 60},
+    },
+    {
+        canvasId: "middle left",
+        holeRect: {x: 10, y: 90, w: 60, h: 60},
+    },
+    {
+        canvasId: "6 points successful",
+        holeRect: {x: 45, y: 80, w: 170, h: 40},
+    },
+    {
+        canvasId: "middle right",
+        holeRect: {x: 160, y: 90, w: 60, h: 60},
+    },
+    {
+        canvasId: "bottom left",
+        holeRect: {x: 20, y: 150, w: 60, h: 60},
+    },
+    {
+        canvasId: "bottom center",
+        holeRect: {x: 85, y: 175, w: 60, h: 60},
+    },
+    {
+        canvasId: "bottom right (corner adversarial)",
+        holeRect: {x: 160, y: 150, w: 60, h: 60},
+    },
+    {
+        canvasId: "6 points adversarial",
+        holeRect: {x: 45, y: 90, w: 170, h: 40},
+    },
+]);
