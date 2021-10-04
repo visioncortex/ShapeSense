@@ -1,18 +1,46 @@
+use wasm_bindgen::prelude::*;
+
 use std::convert::TryInto;
 
-use visioncortex::{Color, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
+use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
 use web_sys::CanvasRenderingContext2d;
 
 use crate::canvas::Canvas;
 
+#[wasm_bindgen]
+#[derive(Clone, Copy, PartialEq)]
+pub enum DisplaySelector {
+    None,
+    Raw,
+    Simplified,
+    Smoothed,
+}
+
 pub struct DrawUtil {
-    pub canvas: Canvas
+    canvas_id: String,
+    pub canvas: Canvas,
+    pub display_selector: DisplaySelector,
+    pub display_tangents: bool,
+}
+
+impl Clone for DrawUtil {
+    fn clone(&self) -> Self {
+        Self {
+            canvas_id: self.canvas_id.clone(),
+            canvas: Canvas::new_from_id(&self.canvas_id).unwrap(),
+            display_selector: self.display_selector.clone(),
+            display_tangents: self.display_tangents.clone(),
+        }
+    }
 }
 
 impl DrawUtil {
-    pub fn new_from_canvas_id(canvas_id: &str) -> Self {
+    pub fn new(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool) -> Self {
         Self {
-            canvas: Canvas::new_from_id(canvas_id).unwrap()
+            canvas_id: canvas_id.to_string(),
+            canvas: Canvas::new_from_id(canvas_id).unwrap(),
+            display_selector,
+            display_tangents,
         }
     }
 
