@@ -5,8 +5,6 @@ use crate::image_repair::find_new_point_from_4_point_scheme;
 use super::{calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
 
 pub struct CurveInterpolatorConfig {
-    // Simplification
-    pub simplify_tolerance: f64,
     // Smoothing
     pub outset_ratio: f64,
     pub min_segment_length: f64,
@@ -20,7 +18,6 @@ pub struct CurveInterpolatorConfig {
 impl Default for CurveInterpolatorConfig {
     fn default() -> Self {
         Self { 
-            simplify_tolerance: 1.5,
             outset_ratio: 8.0,
             min_segment_length: 4.0,
             smooth_max_iterations: 2,
@@ -52,7 +49,7 @@ impl CurveInterpolator {
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, draw_util: &DrawUtil) -> CompoundPath {
+    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool) -> CompoundPath {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -68,28 +65,18 @@ impl CurveInterpolator {
         let (endpoint1, endpoint2) = (curve1[curve1.len()-1], curve2[curve2.len()-1]);
         let base_length = endpoint1.distance_to(endpoint2);
 
-        //# Curve simplification
-        let tolerance = self.config.simplify_tolerance;
-        let simplified_curve1 = PathF64::from_points(visioncortex::reduce::reduce(&curve1.path, tolerance));
-        let simplified_curve2 = PathF64::from_points(visioncortex::reduce::reduce(&curve2.path, tolerance));
-
-        if self.draw_util.display_selector == DisplaySelector::Simplified {
-            draw_util.draw_path_f64(&color1, &simplified_curve1);
-            draw_util.draw_path_f64(&color2, &simplified_curve2);
-        }
-
         //# Curve smoothing
         let outset_ratio = self.config.outset_ratio;
         let min_segment_length = self.config.min_segment_length;
         let max_iterations = self.config.smooth_max_iterations;
         let corner_threshold = self.config.corner_threshold;
 
-        let (smooth_curve1, corners1) = Self::smooth_open_curve_iterative(simplified_curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
-        let (smooth_curve2, corners2) = Self::smooth_open_curve_iterative(simplified_curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
+        let (smooth_curve1, corners1) = Self::smooth_open_curve_iterative(curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
+        let (smooth_curve2, corners2) = Self::smooth_open_curve_iterative(curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
 
         if self.draw_util.display_selector == DisplaySelector::Smoothed {
-            draw_util.draw_path_f64(&color1, &smooth_curve1);
-            draw_util.draw_path_f64(&color2, &smooth_curve2);
+            self.draw_util.draw_path_f64(&color1, &smooth_curve1);
+            self.draw_util.draw_path_f64(&color2, &smooth_curve2);
         }
 
         //# Tail tangent approximation
@@ -101,8 +88,8 @@ impl CurveInterpolator {
 
         if self.draw_util.display_tangents {
             let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
-            draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
-            draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
+            self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
+            self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
         }
         
         //# Curve interpolation

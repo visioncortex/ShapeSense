@@ -105,9 +105,9 @@ impl<T> Path<T>
 where
     T: Clone + PartialEq
 {
-    /// Convert a closed path to an unclosed path.
-    /// A clone of 'self' is returned untouched if 'self' is empty or unclosed.
-    pub fn to_unclosed(&self) -> Self {
+    /// Convert a closed path to an open path.
+    /// A clone of 'self' is returned untouched if 'self' is empty or open.
+    pub fn to_open(&self) -> Self {
         if self.is_empty() {
             return self.clone();
         }

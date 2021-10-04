@@ -2,19 +2,19 @@ use std::{ops::{Index, IndexMut}, slice::Iter, vec::IntoIter};
 
 use visioncortex::PointF64;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MatchItem {
     pub id: usize,
     pub point: PointF64,
     pub direction: PointF64,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct MatchItemSet {
     pub items: Vec<MatchItem>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Matching {
     pub index_pairs: Vec<(usize, usize)>,
 }
@@ -83,6 +83,10 @@ impl MatchItemSet {
         self.items.iter()
     }
 
+    pub fn remove(&mut self, index: usize) -> MatchItem {
+        self.items.remove(index)
+    }
+
     /// Ensure uniqueness of items
     /// Undefined behaviors may be caused if 'push_as_is' was called on this set.
     pub fn push_and_set_id(&mut self, mut match_item: MatchItem) {
@@ -100,6 +104,12 @@ impl MatchItemSet {
 impl Matching {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn from_pairs(pairs: Vec<(usize, usize)>) -> Self {
+        Self {
+            index_pairs: pairs,
+        }
     }
 
     pub fn into_iter(self) -> IntoIter<(usize, usize)> {
@@ -135,7 +145,7 @@ impl IndexMut<usize> for SquareDistanceMatrix {
 impl SquareDistanceMatrix {
     /// Create a DistanceMatrix and set the pairwise distances ('set1'-by-'set2')
     /// The behavior is undefined unless 'set1' and 'set2' have the same number of items.
-    pub fn from_two_sets(set1: MatchItemSet, set2: MatchItemSet) -> Self {
+    pub fn from_two_sets(set1: &MatchItemSet, set2: &MatchItemSet) -> Self {
         assert_eq!(set1.len(), set2.len());
         let n = set1.len();
 
@@ -198,7 +208,7 @@ mod tests {
         let match_item_set2 = MatchItemSet::from_match_items_and_set_ids(match_items_iter2.collect());
 
         // WHEN
-        let distance_matrix = SquareDistanceMatrix::from_two_sets(match_item_set1, match_item_set2);
+        let distance_matrix = SquareDistanceMatrix::from_two_sets(&match_item_set1, &match_item_set2);
 
         // THEN
         let n = points1.len();

@@ -85,7 +85,7 @@ pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
         return vec![];
     }
     
-    let path = path.to_unclosed();
+    let path = path.to_open();
     let len = path.len();
 
     let mut corners: Vec<bool> = vec![false; len];

@@ -60,6 +60,18 @@ export const indexTestInputs: Array<IndexTestInput> = [
         }
     },
     {
+        canvasId: "4 endpoints (1)",
+        holeRect: {x: 25, y: 50, w: 150, h: 40},
+    },
+    {
+        canvasId: "4 endpoints (2)",
+        holeRect: {x: 25, y: 130, w: 150, h: 40},
+    },
+    {
+        canvasId: "4 endpoints (3)",
+        holeRect: {x: 25, y: 190, w: 150, h: 40},
+    },
+    {
         canvasId: "rectangle top left",
         holeRect: {x: 10, y: 10, w: 70, h: 70},
         drawForeground:(canvas) => {
