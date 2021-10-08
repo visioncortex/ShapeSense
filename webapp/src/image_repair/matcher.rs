@@ -1,3 +1,8 @@
+use std::{collections::HashSet, iter::FromIterator};
+
+use permutator::Combination;
+use visioncortex::PointF64;
+
 use crate::{image_repair::SquareDistanceMatrix, util::console_log_util};
 
 use super::{MatchItem, MatchItemSet, Matching};
@@ -16,7 +21,8 @@ impl Matcher {
         assert_eq!(len % 2, 0);
         assert!(len > 0);
 
-        let (set1, set2) = Self::partition(match_items, direction_difference_threshold);
+        // let (set1, set2) = Self::partition(match_items, direction_difference_threshold);
+        let (set1, set2) = Self::brute_force_partition(match_items);
 
         let distance_matrix = SquareDistanceMatrix::from_two_sets(&set1, &set2);
 
@@ -28,13 +34,75 @@ impl Matcher {
 
 // Helper functions
 impl Matcher {
+    fn brute_force_partition(items: MatchItemSet) -> (MatchItemSet, MatchItemSet) {
+        let len = items.len();
+        let indices: Vec<usize> = (0..len).into_iter().collect();
+
+        let mut best_sets = Default::default();
+        let mut best_average_variance = f64::MAX;
+        indices.combination(len >> 1).for_each(|set1_indices| {
+            let set1_indices: HashSet<usize> = set1_indices.into_iter().copied().collect();
+            let (mut set1, mut set2) = (MatchItemSet::new(), MatchItemSet::new());
+            for i in 0..len {
+                if set1_indices.contains(&i) {
+                    set1.push_as_is(items[i]);
+                } else {
+                    set2.push_as_is(items[i]);
+                }
+            }
+
+            let current_average_variance = Self::calculate_average_variance(&set1, &set2);
+            if current_average_variance < best_average_variance {
+                best_average_variance = current_average_variance;
+                best_sets = (set1, set2);
+            }
+        });
+
+        best_sets
+    }
+
+    fn calculate_average_variance(set1: &MatchItemSet, set2: &MatchItemSet) -> f64 {
+        let calculate_average_direction = |set: &MatchItemSet| {
+            let len = set.len();
+            let sum_direction: PointF64 = set.iter()
+                                             .fold(PointF64::default(), |acc, item2| {
+                                                acc + item2.direction
+                                             });
+            let average_direction = sum_direction / (len as f64);
+            average_direction.get_normalized()
+        };
+
+        let calculate_variance = |set: &MatchItemSet| {
+            let len = set.len();
+            if len == 1 {
+                return 0.0;
+            }
+
+            let average_direction = calculate_average_direction(set);
+            let sum_distances: f64 = set.iter()
+                                   .map(|item| {
+                                       item.direction.get_normalized().distance_to(average_direction)
+                                   })
+                                   .sum();
+            sum_distances / (len - 1) as f64
+        };
+
+        let (variance1, variance2) = (calculate_variance(set1), calculate_variance(set2));
+        (variance1 + variance2) / 2.0
+    }
+
+    // =========================================================================================================
+
     fn partition(items: MatchItemSet, direction_difference_threshold: f64) -> (MatchItemSet, MatchItemSet) {
         let (set1, set2) = Self::partition_by_direction(&items, direction_difference_threshold);
-        if !set1.is_empty() && !set2.is_empty() {
+
+        let (set1, set2) = if !set1.is_empty() && !set2.is_empty() {
             (set1, set2)
         } else {
             Self::partition_by_distance(items)
-        }
+        };
+
+        Self::force_balance_partition(set1, set2)
     }
 
     /// Partition (deep-copying items) 'items' into 2 sets that are complete and disjoint.
@@ -124,6 +192,19 @@ impl Matcher {
 
             set1.push_as_is(items.remove(prev));
             set2.push_as_is(items.remove(curr));
+        }
+
+        (set1, set2)
+    }
+
+    fn force_balance_partition(mut set1: MatchItemSet, mut set2: MatchItemSet) -> (MatchItemSet, MatchItemSet) {
+        while set1.len() != set2.len() {
+            let (set1_len, set2_len) = (set1.len(), set2.len());
+            if set1_len > set2_len {
+                set2.push_as_is(set1.remove(set1_len-1));
+            } else {
+                set1.push_as_is(set2.remove(set2_len-1));
+            }
         }
 
         (set1, set2)

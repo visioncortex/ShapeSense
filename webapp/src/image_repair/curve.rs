@@ -28,7 +28,7 @@ impl Default for CurveInterpolatorConfig {
     }
 }
 
-/// Interpolate in-between curve give 2 curves and tangents at their endpoints
+/// Interpolate in-between curve given 2 curves
 pub struct CurveInterpolator {
     pub config: CurveInterpolatorConfig,
     pub hole_rect: BoundingRect,
@@ -233,8 +233,12 @@ impl CurveInterpolator {
     fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>) -> Spline {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;
         // Take or recalculate
+        
         let intersection = if let Some(intersection) = intersection_option { intersection }
-                           else { calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent).unwrap() };
+                           else { calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent).unwrap_or_else(|| {
+                            //    console_log_util(format!("{:?}\n{:?}", from_point, to_point));
+                               panic!("Subdivided curve is not simple.");
+                           }) };
 
         let length_from_and_intersection = from_point.distance_to(intersection);
         let length_to_and_intersection = to_point.distance_to(intersection);

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bit_vec::BitVec;
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
@@ -47,9 +49,10 @@ impl Repairer {
 
         //# Path identification, segmentation, and simplification
         let simplify_tolerance = 2.0;
+        let mut endpoints = HashSet::new();
         let path_segments: Vec<PathI32> = paths.into_iter()
                                                .map(|path| {
-                                                   self.find_segments_on_path(path, simplify_tolerance)
+                                                   self.find_segments_on_path_with_unique_endpoints(path, &mut endpoints, simplify_tolerance)
                                                })
                                                .flatten()
                                                .collect();
@@ -57,6 +60,8 @@ impl Repairer {
         //# Matching paths
         let direction_difference_threshold = 0.15;
         let matching = self.find_matching(&path_segments, direction_difference_threshold);
+
+        // matching.index_pairs.iter().for_each(|&(i1, i2)| console_log_util(format!("{:?}\n {:?}", path_segments[i1][0], path_segments[i2][0])));
 
         for (index1, index2) in matching.into_iter() {
             let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
@@ -116,7 +121,7 @@ impl Repairer {
 
     /// Return a vector of *simplified* path segments whose heads are endpoints, pointing outwards from hole_rect.
     /// Segments are walked until 'max_num_points' is reached or another boundary point is reached, whichever happens first.
-    fn find_segments_on_path(&self, path: PathI32, simplify_tolerance: f64) -> Vec<PathI32> {
+    fn find_segments_on_path_with_unique_endpoints(&self, path: PathI32, current_endpoints: &mut HashSet<PointI32>, simplify_tolerance: f64) -> Vec<PathI32> {
         let path = path.to_open();
         let len = path.len();
         let is_boundary_mask = BitVec::from_fn(len, |i| {
@@ -131,8 +136,13 @@ impl Repairer {
             !(is_boundary_mask[prev] && is_boundary_mask[next]) // not both neighbors are on boundary
         });
 
-        endpoints_iter.map(|endpoint| {
-            self.walk_segment(&path, endpoint, &is_boundary_mask, simplify_tolerance)
+        endpoints_iter.filter_map(|endpoint| {
+            let inserted = current_endpoints.insert(path[endpoint]);
+            if inserted {
+                Some(self.walk_segment(&path, endpoint, &is_boundary_mask, simplify_tolerance))
+            } else {
+                None
+            }
         }).collect()
     }
 
