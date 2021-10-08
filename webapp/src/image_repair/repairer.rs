@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathF64, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
+use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher}, util::console_log_util};
 
-use super::{Matching, draw::{DisplaySelector, DrawUtil}};
+use super::{draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
 pub struct Repairer {
@@ -58,7 +58,6 @@ impl Repairer {
                                                .collect();
 
         //# Matching paths
-        let direction_difference_threshold = 0.15;
         let match_item_set = self.construct_match_item_set(&path_segments);
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 

@@ -1,4 +1,4 @@
-use std::{collections::HashSet, iter::FromIterator};
+use std::{collections::HashSet};
 
 use permutator::{Combination, factorial, multiply_factorial};
 use visioncortex::PointF64;

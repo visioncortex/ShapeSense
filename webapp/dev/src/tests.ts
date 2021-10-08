@@ -249,7 +249,7 @@ shapeTestInputs.set("shape4", [
         holeRect: {x: 10, y: 90, w: 60, h: 60},
     },
     {
-        canvasId: "6 points successful",
+        canvasId: "6 points",
         holeRect: {x: 45, y: 80, w: 170, h: 40},
     },
     {
@@ -281,7 +281,31 @@ shapeTestInputs.set("shape4", [
         holeRect: { x: 55, y: 170, w: 170, h: 35 },
     },
     {
-        canvasId: "8 points",
+        canvasId: "long hole 1",
+        holeRect: { x: 15, y: 35, w: 200, h: 40 },
+    },
+    {
+        canvasId: "long hole 2 (adversarial)",
+        holeRect: { x: 15, y: 40, w: 200, h: 40 },
+    },
+    {
+        canvasId: "long hole 3",
+        holeRect: { x: 15, y: 50, w: 200, h: 40 },
+    },
+    {
+        canvasId: "long hole 4",
+        holeRect: { x: 15, y: 70, w: 200, h: 40 },
+    },
+    {
+        canvasId: "long hole 5",
         holeRect: { x: 15, y: 90, w: 200, h: 40 },
+    },
+    {
+        canvasId: "long hole 6",
+        holeRect: { x: 15, y: 120, w: 200, h: 40 },
+    },
+    {
+        canvasId: "long hole 7",
+        holeRect: { x: 15, y: 155, w: 200, h: 40 },
     },
 ]);
