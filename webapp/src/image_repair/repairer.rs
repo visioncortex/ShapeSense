@@ -61,6 +61,8 @@ impl Repairer {
         let match_item_set = self.construct_match_item_set(&path_segments);
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
+
+        let mut drawn = false;
         'matching_loop: for matching in matchings.into_iter() {
             let mut interpolated_curves = vec![];
             for (index1, index2) in matching.into_iter() {
@@ -87,8 +89,13 @@ impl Repairer {
             interpolated_curves.into_iter().for_each(|interpolated_curve| {
                 self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
             });
+            drawn = true;
             // Trust it to be the correct solution
             break;
+        }
+
+        if !drawn {
+            panic!("No curve drawn!");
         }
     }
 }
