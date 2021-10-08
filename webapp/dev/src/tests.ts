@@ -269,7 +269,19 @@ shapeTestInputs.set("shape4", [
         holeRect: {x: 160, y: 150, w: 60, h: 60},
     },
     {
-        canvasId: "6 points adversarial",
-        holeRect: {x: 45, y: 90, w: 170, h: 40},
+        canvasId: "6 points right upper (partition adversarial)",
+        holeRect: { x: 45, y: 65, w: 170, h: 40 },
+    },
+    {
+        canvasId: "6 points right ~center",
+        holeRect: { x: 45, y: 110, w: 170, h: 40 },
+    },
+    {
+        canvasId: "6 points right lower",
+        holeRect: { x: 55, y: 170, w: 170, h: 35 },
+    },
+    {
+        canvasId: "8 points",
+        holeRect: { x: 15, y: 90, w: 200, h: 40 },
     },
 ]);

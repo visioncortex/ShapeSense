@@ -59,26 +59,37 @@ impl Repairer {
 
         //# Matching paths
         let direction_difference_threshold = 0.15;
-        let matching = self.find_matching(&path_segments, direction_difference_threshold);
+        let match_item_set = self.construct_match_item_set(&path_segments);
+        let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
-        // matching.index_pairs.iter().for_each(|&(i1, i2)| console_log_util(format!("{:?}\n {:?}", path_segments[i1][0], path_segments[i2][0])));
+        'matching_loop: for matching in matchings.into_iter() {
+            let mut interpolated_curves = vec![];
+            for (index1, index2) in matching.into_iter() {
+                let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
 
-        for (index1, index2) in matching.into_iter() {
-            let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
+                if self.draw_util.display_selector == DisplaySelector::Simplified {
+                    let color1 = Color::get_palette_color(1);
+                    let color2 = Color::get_palette_color(3);
+                    self.draw_util.draw_path_f64(&color1, &curve1);
+                    self.draw_util.draw_path_f64(&color2, &curve2);
+                }
 
-            if self.draw_util.display_selector == DisplaySelector::Simplified {
-                let color1 = Color::get_palette_color(1);
-                let color2 = Color::get_palette_color(3);
-                self.draw_util.draw_path_f64(&color1, &curve1);
-                self.draw_util.draw_path_f64(&color2, &curve2);
+                let curve_interpolator_config = CurveInterpolatorConfig::default();
+                let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, self.hole_rect, self.draw_util.clone());
+                
+                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false) {
+                    interpolated_curves.push(interpolated_curve);
+                } else {
+                    // A curve cannot be interpolated, this matching is wrong
+                    continue 'matching_loop;
+                }
             }
-
-            let curve_interpolator_config = CurveInterpolatorConfig::default();
-            let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, self.hole_rect, self.draw_util.clone());
-
-            let interpolated_curve = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false);
-            
-            self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
+            // If all curves can be interpolated without problems, draw them
+            interpolated_curves.into_iter().for_each(|interpolated_curve| {
+                self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
+            });
+            // Trust it to be the correct solution
+            break;
         }
     }
 }
@@ -181,7 +192,7 @@ impl Repairer {
     /// The behavior is undefined unless 'path_segments' has an even number of elements.
     /// The behavior is also undefined unless every segment has at least 2 points.
     /// The behavior is also undefined unless all segments have their tails at index 0.
-    fn find_matching(&self, path_segments: &[PathI32], direction_difference_threshold: f64) -> Matching {
+    fn construct_match_item_set(&self, path_segments: &[PathI32]) -> MatchItemSet {
         assert_eq!(path_segments.len() % 2, 0);
         let match_items_iter = path_segments.iter()
                                             .map(|segment| {
@@ -192,6 +203,6 @@ impl Repairer {
                                             });
         let mut match_item_set = MatchItemSet::new();
         match_items_iter.for_each(|match_item| {match_item_set.push_and_set_id(match_item)});
-        Matcher::find_matching(match_item_set, direction_difference_threshold)
+        match_item_set
     }
 }

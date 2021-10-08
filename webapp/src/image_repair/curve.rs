@@ -49,7 +49,7 @@ impl CurveInterpolator {
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool) -> CompoundPath {
+    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool) -> Option<CompoundPath> {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -200,15 +200,14 @@ impl CurveInterpolator {
         tangent_acc.get_normalized()
     }
 
-    fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64) -> CompoundPath {
+    fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64) -> Option<CompoundPath> {
         let intersection_option = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
         let mut compound_path = CompoundPath::new();
 
         if intersection_option.is_some() {
             // Only 1 big part
-            compound_path.add_spline(
-                self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, intersection_option)
-            );
+            let spline = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, intersection_option)?;
+            compound_path.add_spline(spline);
         } else {
             // S-shape detected
             // Divide into 2 parts and concatenate
@@ -218,27 +217,24 @@ impl CurveInterpolator {
             let from_side_normal = if from_tangent.dot(normal) > 0.0 {normal} else {-normal};
             let to_side_normal = -from_side_normal;
             // Calculate the two parts of the curve, recalculating the intersections
-            let from_side_curve = self.calculate_part_curve(from_point, from_tangent, mid_point, from_side_normal, None);
-            let to_side_curve = self.calculate_part_curve(mid_point, to_side_normal, to_point, to_tangent, None);
+            let from_side_curve = self.calculate_part_curve(from_point, from_tangent, mid_point, from_side_normal, None)?;
+            let to_side_curve = self.calculate_part_curve(mid_point, to_side_normal, to_point, to_tangent, None)?;
 
             compound_path.add_spline(from_side_curve);
             compound_path.add_spline(to_side_curve);
         }
 
-        compound_path
+        Some(compound_path)
     }
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     /// 'intersection_option' is only to avoid unnecessary recalculation.
-    fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>) -> Spline {
+    fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>) -> Option<Spline> {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;
         // Take or recalculate
         
         let intersection = if let Some(intersection) = intersection_option { intersection }
-                           else { calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent).unwrap_or_else(|| {
-                            //    console_log_util(format!("{:?}\n{:?}", from_point, to_point));
-                               panic!("Subdivided curve is not simple.");
-                           }) };
+                           else { calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent)? };
 
         let length_from_and_intersection = from_point.distance_to(intersection);
         let length_to_and_intersection = to_point.distance_to(intersection);
@@ -265,6 +261,6 @@ impl CurveInterpolator {
         
         let mut spline = Spline::new(from_point);
         spline.add(control_point1, control_point2, to_point);
-        spline
+        Some(spline)
     }
 }

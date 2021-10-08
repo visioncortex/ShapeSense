@@ -1,6 +1,6 @@
 use std::{collections::HashSet, iter::FromIterator};
 
-use permutator::Combination;
+use permutator::{Combination, factorial, multiply_factorial};
 use visioncortex::PointF64;
 
 use crate::{image_repair::SquareDistanceMatrix, util::console_log_util};
@@ -13,7 +13,7 @@ pub struct Matcher;
 
 // API
 impl Matcher {
-    /// Find a complete, disjoint, pair matching of those points such that the sum of distances between the pairs is at minimum.
+    /// Find the overall 'optimal' matching. Definition of optimality is to be determined.
     /// The behavior is undefined unless 'match_items' contains n items where n is even and n>0.
     /// 'direction_difference_threshold': [0.0, 1.0]
     pub fn find_matching(match_items: MatchItemSet, direction_difference_threshold: f64) -> Matching {
@@ -21,8 +21,9 @@ impl Matcher {
         assert_eq!(len % 2, 0);
         assert!(len > 0);
 
-        // let (set1, set2) = Self::partition(match_items, direction_difference_threshold);
-        let (set1, set2) = Self::brute_force_partition(match_items);
+        let (set1, set2) = Self::partition(match_items, direction_difference_threshold);
+
+        // console_log_util(format!("{:?}\n\n{:?}", set1, set2));
 
         let distance_matrix = SquareDistanceMatrix::from_two_sets(&set1, &set2);
 
@@ -30,37 +31,55 @@ impl Matcher {
 
         Matching::from_pairs(index_matching.into_iter().map(|(index1, index2)| {(set1[index1].id, set2[index2].id)}).collect())
     }
+
+    /// Find all possible matchings for each possible partition.
+    /// The behavior is undefined unless 'match_items' contains n items where n is even and n>0.
+    pub fn find_all_possible_matchings(match_items: MatchItemSet) -> Vec<Matching> {
+        let len = match_items.len();
+        assert_eq!(len % 2, 0);
+        assert!(len > 0);
+
+        let indices: Vec<usize> = (0..len).into_iter().collect();
+
+        // nCr
+        let (n, r) = (len, len >> 1);
+        let num_combinations = factorial(n) / multiply_factorial(r, n-r);
+        // Only interested in the first half of the nCr space (second half is equivalent)
+        let mut matchings_with_variances: Vec<(Matching, f64)> = indices.combination(r).take(num_combinations >> 1).map(|set1_indices| {
+                let set1_indices: HashSet<usize> = set1_indices.into_iter().copied().collect();
+                let (mut set1, mut set2) = (MatchItemSet::new(), MatchItemSet::new());
+                for i in 0..len {
+                    if set1_indices.contains(&i) {
+                        set1.push_as_is(match_items[i]);
+                    } else {
+                        set2.push_as_is(match_items[i]);
+                    }
+                }
+
+                let variance = Self::calculate_average_variance(&set1, &set2);
+
+                let distance_matrix = SquareDistanceMatrix::from_two_sets(&set1, &set2);
+
+                let index_matching = distance_matrix.into_matching();
+
+                (
+                    Matching::from_pairs(index_matching.into_iter()
+                                                   .map(|(index1, index2)| {
+                                                       (set1[index1].id, set2[index2].id)
+                                                    })
+                                                    .collect()),
+                    variance
+                )
+            })
+            .collect();
+        matchings_with_variances.sort_by(|(_, variance1), (_, variance2)| variance1.partial_cmp(variance2).unwrap());
+
+        matchings_with_variances.into_iter().map(|(matching, _)| matching).collect()
+    }
 }
 
 // Helper functions
 impl Matcher {
-    fn brute_force_partition(items: MatchItemSet) -> (MatchItemSet, MatchItemSet) {
-        let len = items.len();
-        let indices: Vec<usize> = (0..len).into_iter().collect();
-
-        let mut best_sets = Default::default();
-        let mut best_average_variance = f64::MAX;
-        indices.combination(len >> 1).for_each(|set1_indices| {
-            let set1_indices: HashSet<usize> = set1_indices.into_iter().copied().collect();
-            let (mut set1, mut set2) = (MatchItemSet::new(), MatchItemSet::new());
-            for i in 0..len {
-                if set1_indices.contains(&i) {
-                    set1.push_as_is(items[i]);
-                } else {
-                    set2.push_as_is(items[i]);
-                }
-            }
-
-            let current_average_variance = Self::calculate_average_variance(&set1, &set2);
-            if current_average_variance < best_average_variance {
-                best_average_variance = current_average_variance;
-                best_sets = (set1, set2);
-            }
-        });
-
-        best_sets
-    }
-
     fn calculate_average_variance(set1: &MatchItemSet, set2: &MatchItemSet) -> f64 {
         let calculate_average_direction = |set: &MatchItemSet| {
             let len = set.len();
@@ -91,7 +110,7 @@ impl Matcher {
         (variance1 + variance2) / 2.0
     }
 
-    // =========================================================================================================
+    // ============================================================================================================
 
     fn partition(items: MatchItemSet, direction_difference_threshold: f64) -> (MatchItemSet, MatchItemSet) {
         let (set1, set2) = Self::partition_by_direction(&items, direction_difference_threshold);

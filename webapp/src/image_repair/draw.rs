@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 use std::convert::TryInto;
 
-use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
+use visioncortex::{Color, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
 use web_sys::CanvasRenderingContext2d;
 
 use crate::canvas::Canvas;
@@ -28,8 +28,8 @@ impl Clone for DrawUtil {
         Self {
             canvas_id: self.canvas_id.clone(),
             canvas: Canvas::new_from_id(&self.canvas_id).unwrap(),
-            display_selector: self.display_selector.clone(),
-            display_tangents: self.display_tangents.clone(),
+            display_selector: self.display_selector,
+            display_tangents: self.display_tangents,
         }
     }
 }
