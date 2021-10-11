@@ -21,6 +21,7 @@ pub struct DrawUtil {
     pub canvas: Canvas,
     pub display_selector: DisplaySelector,
     pub display_tangents: bool,
+    pub display_control_points: bool,
 }
 
 impl Clone for DrawUtil {
@@ -30,17 +31,19 @@ impl Clone for DrawUtil {
             canvas: Canvas::new_from_id(&self.canvas_id).unwrap(),
             display_selector: self.display_selector,
             display_tangents: self.display_tangents,
+            display_control_points: self.display_control_points,
         }
     }
 }
 
 impl DrawUtil {
-    pub fn new(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool) -> Self {
+    pub fn new(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool, display_control_points: bool) -> Self {
         Self {
             canvas_id: canvas_id.to_string(),
             canvas: Canvas::new_from_id(canvas_id).unwrap(),
             display_selector,
             display_tangents,
+            display_control_points,
         }
     }
 
@@ -55,7 +58,12 @@ impl DrawUtil {
     }
     
     pub fn draw_pixel_i32(&self, color: &Color, point: PointI32) {
-        self.fill_rect(color, point.x as usize, point.y as usize, 1, 1)
+        self.fill_rect(color, point.x as usize, point.y as usize, 1, 1);
+    }
+
+    pub fn draw_cross_i32(&self, color: &Color, center: PointI32) {
+        self.fill_rect(color, center.x as usize - 1, center.y as usize, 3, 1);
+        self.fill_rect(color, center.x as usize, center.y as usize - 1, 1, 3);
     }
 
     pub fn draw_path_i32(&self, color: &Color, path: &PathI32) {

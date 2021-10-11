@@ -55,11 +55,11 @@ export class DrawingCanvas {
         this.ctx.fill();
     }
 
-    process(displaySelector: DisplaySelector, displayTangents: boolean) {
+    process(displaySelector: DisplaySelector, displayTangents: boolean, displayControlPoints: boolean) {
         if (typeof this.holeRect === typeof undefined) {
             throw new Error("There is no hole defined for this canvas!");
         }
-        const repairer = new Repairer(this.ctx.canvas.id, displaySelector, displayTangents, this.holeRect.x, this.holeRect.y, this.holeRect.w, this.holeRect.h);
+        const repairer = new Repairer(this.ctx.canvas.id, displaySelector, displayTangents, displayControlPoints, this.holeRect.x, this.holeRect.y, this.holeRect.w, this.holeRect.h);
         repairer.repair();
         repairer.free();
     }

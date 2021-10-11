@@ -5,6 +5,7 @@ import { shapeTestInputs, IndexTestInput, indexTestInputs, TestInput } from "./t
 // Controls
 const displaySelector = DisplaySelector.None;
 const displayTangents = false;
+const displayControlPoints = true;
 // End of Controls
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -60,7 +61,7 @@ function process(canvas: DrawingCanvas, testInput: TestInput) {
     let status: {canvasId: string, success: boolean};
     
     try {
-        canvas.process(displaySelector, displayTangents);
+        canvas.process(displaySelector, displayTangents, displayControlPoints);
         status = {canvasId: testInput.canvasId, success: true};
     } catch (e) {
         console.error(e);

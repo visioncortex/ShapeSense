@@ -1,4 +1,4 @@
-use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
+use visioncortex::{BoundingRect, Color, ColorName, CompoundPath, PathF64, PointF64, Spline};
 
 use crate::{image_repair::find_new_point_from_4_point_scheme, util::console_log_util};
 
@@ -320,6 +320,12 @@ impl CurveInterpolator {
                 }
             },
         };
+
+        if self.draw_util.display_control_points {
+            let color = Color::color(&ColorName::Black);
+            self.draw_util.draw_cross_i32(&color, control_point1.to_point_i32());
+            self.draw_util.draw_cross_i32(&color, control_point2.to_point_i32());
+        }
         
         let mut spline = Spline::new(from_point);
         spline.add(control_point1, control_point2, to_point);

@@ -19,8 +19,8 @@ pub struct Repairer {
 #[wasm_bindgen]
 impl Repairer {
     #[wasm_bindgen(constructor)]
-    pub fn new_from_canvas_id_and_mask(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool, x: usize, y: usize, w: usize, h: usize) -> Self {
-        let draw_util = DrawUtil::new(canvas_id, display_selector, display_tangents);
+    pub fn new_from_canvas_id_and_mask(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool, display_control_points: bool, x: usize, y: usize, w: usize, h: usize) -> Self {
+        let draw_util = DrawUtil::new(canvas_id, display_selector, display_tangents, display_control_points);
         let canvas = &draw_util.canvas;
 
         // Raw image
