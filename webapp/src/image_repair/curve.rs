@@ -1,6 +1,6 @@
 use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
 
-use crate::image_repair::find_new_point_from_4_point_scheme;
+use crate::{image_repair::find_new_point_from_4_point_scheme, util::console_log_util};
 
 use super::{calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
 

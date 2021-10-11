@@ -1,4 +1,4 @@
-use std::{ops::{Index, IndexMut}, slice::Iter, vec::IntoIter};
+use std::{collections::HashMap, hash::Hash, ops::{Index, IndexMut}, slice::Iter, vec::IntoIter};
 
 use visioncortex::PointF64;
 
@@ -98,6 +98,65 @@ impl MatchItemSet {
     /// Undefined behaviors may be caused if 'push_and_set_id' was called on this set.
     pub fn push_as_is(&mut self, match_item: MatchItem) {
         self.items.push(match_item)
+    }
+}
+
+fn sort_index_pair(pair: (usize, usize)) -> (usize, usize) {
+    let (a, b) = pair;
+    if a <= b {
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+/// ONLY the pairs themselves are sorted, the whole vector is not sorted.
+fn get_sorted_index_pairs(index_pairs: &[(usize, usize)]) -> Vec<(usize, usize)> {
+    index_pairs.iter()
+               .map(|&pair| sort_index_pair(pair))
+               .collect()
+}
+
+impl PartialEq for Matching {
+    // O(n)
+    fn eq(&self, other: &Self) -> bool {
+        let len = self.index_pairs.len();
+        if len != other.index_pairs.len() {
+            return false;
+        }
+        // Only the pairs themselves are sorted, so these are O(n)
+        let self_sorted_index_pairs = get_sorted_index_pairs(&self.index_pairs);
+        let other_sorted_index_pairs = get_sorted_index_pairs(&other.index_pairs);
+
+        let self_index_hash_map: HashMap<usize, usize> = self_sorted_index_pairs.into_iter().collect();
+
+        // self == other iff all pairs in 'other_sorted_index_pairs' match the mapping
+        other_sorted_index_pairs.into_iter()
+                                .all(|(a, b)| {
+                                    let self_b_option = self_index_hash_map.get(&a);
+                                    if let Some(&self_b) = self_b_option {
+                                        self_b == b
+                                    } else {
+                                        false
+                                    }
+                                })
+    }
+}
+
+impl Eq for Matching {}
+
+impl Hash for Matching {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Only the pairs themselves are sorted, so this is O(n)
+        let self_sorted_index_pairs = get_sorted_index_pairs(&self.index_pairs);
+
+        // Sums are order-invariant
+        let (sum_a, sum_b) = self_sorted_index_pairs.into_iter()
+                                                    .fold((0, 0), |(sum_a, sum_b), (a, b)| {
+                                                        (sum_a + a, sum_b + b)
+                                                    });
+        sum_a.hash(state);
+        sum_b.hash(state);
     }
 }
 
