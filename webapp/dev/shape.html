@@ -14,6 +14,21 @@
         <a href="#" id="back"><button>Back</button></a>
         <a href="#" id="next"><button>Next</button></a>
     </div>
+    <div id="controls">
+        <br>
+        <select id="displaySelector">
+            <option value="None" selected>None</option>
+            <option value="Simplified">Simplified</option>
+            <option value="Smoothed">Smoothed</option>
+        </select>
+        <label for="displaySelector">Display paths</label>
+        <br>
+        <input type="checkbox" id="displayTangents" /> <label for="displayTangents">Display tangents</label>
+        <br>
+        <input type="checkbox" id="displayControlPoints" /> <label for="displayControlPoints">Display control points</label>
+        <br>
+        <br>
+    </div>
     <div>
         <canvas id="original"></canvas>
     </div>

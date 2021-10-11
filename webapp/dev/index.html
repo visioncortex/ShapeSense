@@ -11,6 +11,21 @@
         <h3>Image Repairing in Rust</h3>
         <p>Background is dark, hole is white.</p>
     </div>
+    <div id="controls">
+        <br>
+        <select id="displaySelector">
+            <option value="None" selected>None</option>
+            <option value="Simplified">Simplified</option>
+            <option value="Smoothed">Smoothed</option>
+        </select>
+        <label for="displaySelector">Display paths</label>
+        <br>
+        <input type="checkbox" id="displayTangents" /> <label for="displayTangents">Display tangents</label>
+        <br>
+        <input type="checkbox" id="displayControlPoints" /> <label for="displayControlPoints">Display control points</label>
+        <br>
+        <br>
+    </div>
     <div>
         <canvas id="original" width="200px" height="300px"></canvas>
     </div>

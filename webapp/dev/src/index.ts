@@ -2,11 +2,60 @@ import { DisplaySelector } from "image-repair";
 import { DrawingCanvas } from "./canvas";
 import { shapeTestInputs, IndexTestInput, indexTestInputs, TestInput } from "./tests";
 
+interface Indexable {
+    [key: string]: any;
+}
+
 // Controls
-const displaySelector = DisplaySelector.None;
-const displayTangents = false;
-const displayControlPoints = true;
+const controls = ({
+    displaySelector: DisplaySelector.None,
+    displayTangents: false,
+    displayControlPoints: false,
+}) as Indexable;
 // End of Controls
+
+// Controls GUI
+const handleCheckboxChange = (checkboxElement: HTMLInputElement) => async (_: Event) => {
+    const checked = checkboxElement.checked;
+    controls[checkboxElement.id] = checked;
+    await run();
+};
+
+const controlsDiv = document.getElementById("controls");
+for (let controlElem of Array.from(controlsDiv.children)) {
+    if (controlElem.tagName === "INPUT") {
+        let inputElem = controlElem as HTMLInputElement;
+        switch (inputElem.type) {
+            case "checkbox":
+                inputElem.onchange = handleCheckboxChange(inputElem);
+                break;
+
+            default:
+        }
+        continue;
+    }
+
+    if (controlElem.tagName === "SELECT") {
+        let selectElem = controlElem as HTMLSelectElement;
+        selectElem.onchange = async (_) => {
+            switch (selectElem.value) {
+                case "None":
+                default:
+                    controls[selectElem.id] = DisplaySelector.None;
+                    break;
+                case "Simplified":
+                    controls[selectElem.id] = DisplaySelector.Simplified;
+                    break;
+                case "Smoothed":
+                    controls[selectElem.id] = DisplaySelector.Smoothed;
+                    break;
+            }
+            await run();
+        };
+        continue;
+    }
+}
+// End of Controls GUI
 
 const urlParams = new URLSearchParams(window.location.search);
 const shapeId = urlParams.get("id");
@@ -54,6 +103,7 @@ function createShapeLinks() {
         divElem.appendChild(shapeLink);
     }
 }
+if (document.body.id === "index") createShapeLinks();
 
 function process(canvas: DrawingCanvas, testInput: TestInput) {
     canvas.holeRect = testInput.holeRect;
@@ -61,7 +111,7 @@ function process(canvas: DrawingCanvas, testInput: TestInput) {
     let status: {canvasId: string, success: boolean};
     
     try {
-        canvas.process(displaySelector, displayTangents, displayControlPoints);
+        canvas.process(controls.displaySelector, controls.displayTangents, controls.displayControlPoints);
         status = {canvasId: testInput.canvasId, success: true};
     } catch (e) {
         console.error(e);
@@ -73,6 +123,11 @@ function process(canvas: DrawingCanvas, testInput: TestInput) {
 
 async function run() {
 
+console.clear();
+
+const canvasDiv = document.getElementById("canvasDiv");
+while (canvasDiv.hasChildNodes()) canvasDiv.removeChild(canvasDiv.lastChild);
+
 originalCanvas.drawBackground();
 
 let testInputs: Array<TestInput>;
@@ -81,7 +136,6 @@ switch (document.body.id) {
     case "index":
         testInputs = indexTestInputs;
         originalCanvas.drawForeground();
-        createShapeLinks();
         break;
     default:
         testInputs = shapeTestInputs.get("shape" + currentShape);

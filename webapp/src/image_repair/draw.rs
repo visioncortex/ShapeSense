@@ -11,7 +11,6 @@ use crate::canvas::Canvas;
 #[derive(Clone, Copy, PartialEq)]
 pub enum DisplaySelector {
     None,
-    Raw,
     Simplified,
     Smoothed,
 }
