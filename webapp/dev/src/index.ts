@@ -1,18 +1,21 @@
 import { DisplaySelector } from "image-repair";
 import { DrawingCanvas } from "./canvas";
-import { shapeTestInputs, FileTestInput, IndexTestInput, indexTestInputs, TestInput } from "./tests";
+import { shapeTestInputs, IndexTestInput, indexTestInputs, TestInput } from "./tests";
 
 // Controls
 const displaySelector = DisplaySelector.None;
-const displayTangents = false;
+const displayTangents = true;
 // End of Controls
 
-const currentShape = parseInt(document.body.id, 10);
+const urlParams = new URLSearchParams(window.location.search);
+const shapeId = urlParams.get("id");
+
+const currentShape = parseInt(shapeId, 10);
 if (currentShape !== NaN) {
     if (currentShape > 1)
-        (document.getElementById("back") as HTMLAnchorElement).href = `./shape${currentShape-1}.html`;
+        (document.getElementById("back") as HTMLAnchorElement).href = `./shape.html?id=${currentShape - 1}`;
     if (currentShape < shapeTestInputs.size)
-        (document.getElementById("next") as HTMLAnchorElement).href = `./shape${currentShape+1}.html`;
+        (document.getElementById("next") as HTMLAnchorElement).href = `./shape.html?id=${currentShape + 1}`;
 }
 
 const originalCanvas = new DrawingCanvas("original");
@@ -33,6 +36,21 @@ function createHTMLCanvasElement(canvasId: string, index: number) {
         document.getElementById("canvasDiv").appendChild(
             document.createElement("BR")
         );
+    }
+}
+
+function createShapeLinks() {
+    let numShapes = shapeTestInputs.size;
+    let divElem = document.getElementById("panel");
+    for (let i = 1; i <= numShapes; ++i) {
+        let shapeButton = document.createElement("BUTTON");
+        shapeButton.innerText = `Shape${i}`;
+
+        let shapeLink = document.createElement("A") as HTMLAnchorElement;
+        shapeLink.href = `shape.html?id=${i}`;
+        shapeLink.appendChild(shapeButton);
+        
+        divElem.appendChild(shapeLink);
     }
 }
 
@@ -62,10 +80,11 @@ switch (document.body.id) {
     case "index":
         testInputs = indexTestInputs;
         originalCanvas.drawForeground();
+        createShapeLinks();
         break;
     default:
-        testInputs = shapeTestInputs.get("shape" + document.body.id);
-        await originalCanvas.loadImage(`./assets/shape${document.body.id}.png`);
+        testInputs = shapeTestInputs.get("shape" + currentShape);
+        await originalCanvas.loadImage(`./assets/shape${currentShape}.png`);
 }
 
 const statusPromiseFactories = testInputs.map( (testInput, i) => async () => {
@@ -83,7 +102,7 @@ const statusPromiseFactories = testInputs.map( (testInput, i) => async () => {
 
     if (document.body.id !== "index") {
         try {
-            await testCanvas.loadImage(`./assets/shape${document.body.id}.png`);
+            await testCanvas.loadImage(`./assets/shape${currentShape}.png`);
         } catch(e) {
             console.groupEnd();
             return {canvasId: testInput.canvasId, success: false};
