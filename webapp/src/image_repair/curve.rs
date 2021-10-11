@@ -49,7 +49,7 @@ impl CurveInterpolator {
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, control_points_retract_ratio: f64) -> Option<CompoundPath> {
+    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, correct_tail_tangents: bool, control_points_retract_ratio: f64) -> Option<CompoundPath> {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -86,10 +86,16 @@ impl CurveInterpolator {
         let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n_points, smooth_curve1_len), base_length, tail_weight_multiplier);
         let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, &corners2, std::cmp::min(tail_tangent_n_points, smooth_curve2_len), base_length, tail_weight_multiplier);
 
+        let (tail_tangent1, tail_tangent2) = if correct_tail_tangents {
+                                                Self::correct_tail_tangents(endpoint1, tail_tangent1, endpoint2, tail_tangent2)
+                                             } else {
+                                                (tail_tangent1, tail_tangent2)
+                                             };
+
         if self.draw_util.display_tangents {
             let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
-            self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1 * tangent_visual_length);
-            self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2 * tangent_visual_length);
+            self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1.get_normalized() * tangent_visual_length);
+            self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2.get_normalized() * tangent_visual_length);
         }
         
         //# Curve interpolation
@@ -200,6 +206,28 @@ impl CurveInterpolator {
         tangent_acc.get_normalized()
     }
 
+    /// Make sure the two tangents do not bend outwards
+    fn correct_tail_tangents(point1: PointF64, mut tangent1: PointF64, point2: PointF64, mut tangent2: PointF64) -> (PointF64, PointF64) {
+        let correct_tangent = |tangent: &mut PointF64, root_point: PointF64, segment_point: PointF64| {
+            let mut unit_normal = calculate_unit_normal_of_line(root_point, segment_point);
+            let root_to_segment = segment_point - root_point;
+            if tangent.dot(root_to_segment) < 0.0 {
+                // 'tangent' is bent outwards
+                if tangent.dot(unit_normal) < 0.0 {
+                    // Use the normal on the other side
+                    unit_normal = -unit_normal;
+                }
+                *tangent = unit_normal * (root_point - segment_point).norm();
+            }
+            // Otherwise, 'tangent' is correct already
+        };
+
+        correct_tangent(&mut tangent1, point1, point2);
+        correct_tangent(&mut tangent2, point2, point1);
+
+        (tangent1, tangent2)
+    }
+
     fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, retract_ratio: f64) -> Option<CompoundPath> {
         let intersection_option = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
         let mut compound_path = CompoundPath::new();
@@ -231,8 +259,8 @@ impl CurveInterpolator {
     /// 'intersection_option' is only to avoid unnecessary recalculation.
     fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>, retract_ratio: f64) -> Option<Spline> {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;
+
         // Take or recalculate
-        
         let intersection = if let Some(intersection) = intersection_option { intersection }
                            else { calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent)? };
 
@@ -245,7 +273,7 @@ impl CurveInterpolator {
             if scaled_base_length > length_with_intersection * 0.5 {
                 control_point = calculate_midpoint(point, intersection)
             } else {
-                control_point = point + tangent.get_normalized() * scaled_base_length
+                control_point = point + tangent * scaled_base_length
             }
 
             // Push the control point inwards

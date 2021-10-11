@@ -4,7 +4,7 @@ import { shapeTestInputs, IndexTestInput, indexTestInputs, TestInput } from "./t
 
 // Controls
 const displaySelector = DisplaySelector.None;
-const displayTangents = true;
+const displayTangents = false;
 // End of Controls
 
 const urlParams = new URLSearchParams(window.location.search);

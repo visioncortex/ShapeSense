@@ -171,6 +171,10 @@ impl Matching {
         }
     }
 
+    pub fn iter(&self) -> Iter<(usize, usize)> {
+        self.index_pairs.iter()
+    }
+
     pub fn into_iter(self) -> IntoIter<(usize, usize)> {
         self.index_pairs.into_iter()
     }

@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher}, util::console_log_util};
 
-use super::{draw::{DisplaySelector, DrawUtil}};
+use super::{Matching, draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
 pub struct Repairer {
@@ -61,41 +61,12 @@ impl Repairer {
         let match_item_set = self.construct_match_item_set(&path_segments);
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
-        let mut drawn = false;
-        'matching_loop: for matching in matchings.into_iter() {
-            let mut interpolated_curves = vec![];
-            for (index1, index2) in matching.into_iter() {
-                let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
-
-                if self.draw_util.display_selector == DisplaySelector::Simplified {
-                    let color1 = Color::get_palette_color(1);
-                    let color2 = Color::get_palette_color(3);
-                    self.draw_util.draw_path_f64(&color1, &curve1);
-                    self.draw_util.draw_path_f64(&color2, &curve2);
-                }
-
-                let curve_interpolator_config = CurveInterpolatorConfig::default();
-                let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, self.hole_rect, self.draw_util.clone());
-                
-                let control_points_retract_ratio = 1.0 / 1.618;
-                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false, control_points_retract_ratio) {
-                    interpolated_curves.push(interpolated_curve);
-                } else {
-                    // A curve cannot be interpolated, this matching is wrong
-                    continue 'matching_loop;
-                }
+        let correct_tail_tangents = false;
+        if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
+            let correct_tail_tangents = true;
+            if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
+                panic!("Still not drawn!");
             }
-            // If all curves can be interpolated without problems, draw them
-            interpolated_curves.into_iter().for_each(|interpolated_curve| {
-                self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
-            });
-            drawn = true;
-            // Trust it to be the correct solution
-            break;
-        }
-
-        if !drawn {
-            panic!("No curve drawn!");
         }
     }
 }
@@ -210,5 +181,44 @@ impl Repairer {
         let mut match_item_set = MatchItemSet::new();
         match_items_iter.for_each(|match_item| {match_item_set.push_and_set_id(match_item)});
         match_item_set
+    }
+
+    /// Return true iff one of the matchings is successfully interpolated
+    fn try_interpolate_with_matchings(matchings: &[Matching], path_segments: &[PathI32], hole_rect: BoundingRect, draw_util: &DrawUtil, correct_tail_tangents: bool) -> bool {
+        let mut drawn = false;
+
+        'matching_loop: for matching in matchings.into_iter() {
+            let mut interpolated_curves = vec![];
+            for &(index1, index2) in matching.iter() {
+                let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
+
+                if draw_util.display_selector == DisplaySelector::Simplified {
+                    let color1 = Color::get_palette_color(1);
+                    let color2 = Color::get_palette_color(3);
+                    draw_util.draw_path_f64(&color1, &curve1);
+                    draw_util.draw_path_f64(&color2, &curve2);
+                }
+
+                let curve_interpolator_config = CurveInterpolatorConfig::default();
+                let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, hole_rect, draw_util.clone());
+                
+                let control_points_retract_ratio = 1.0 / 1.618;
+                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents, control_points_retract_ratio) {
+                    interpolated_curves.push(interpolated_curve);
+                } else {
+                    // A curve cannot be interpolated, this matching is wrong
+                    continue 'matching_loop;
+                }
+            }
+            // If all curves can be interpolated without problems, draw them
+            interpolated_curves.into_iter().for_each(|interpolated_curve| {
+                draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
+            });
+            drawn = true;
+            // Trust it to be the correct solution
+            break;
+        }
+
+        drawn
     }
 }
