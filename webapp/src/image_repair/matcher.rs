@@ -16,6 +16,7 @@ impl Matcher {
     /// Find the overall 'optimal' matching. Definition of optimality is to be determined.
     /// The behavior is undefined unless 'match_items' contains n items where n is even and n>0.
     /// 'direction_difference_threshold': [0.0, 1.0]
+    #[deprecated(note="`find_all_possible_matchings` is currently in use.")]
     pub fn find_matching(match_items: MatchItemSet, direction_difference_threshold: f64) -> Matching {
         let len = match_items.len();
         assert_eq!(len % 2, 0);
