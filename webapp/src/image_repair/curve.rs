@@ -2,7 +2,7 @@ use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline}
 
 use crate::{image_repair::find_new_point_from_4_point_scheme, util::console_log_util};
 
-use super::{calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
+use super::{calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
 
 pub struct CurveInterpolatorConfig {
     // Smoothing
@@ -49,7 +49,7 @@ impl CurveInterpolator {
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool) -> Option<CompoundPath> {
+    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, control_points_retract_ratio: f64) -> Option<CompoundPath> {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -93,7 +93,7 @@ impl CurveInterpolator {
         }
         
         //# Curve interpolation
-        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2)
+        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, control_points_retract_ratio)
     }
 }
 
@@ -200,13 +200,13 @@ impl CurveInterpolator {
         tangent_acc.get_normalized()
     }
 
-    fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64) -> Option<CompoundPath> {
+    fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, retract_ratio: f64) -> Option<CompoundPath> {
         let intersection_option = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
         let mut compound_path = CompoundPath::new();
 
         if intersection_option.is_some() {
             // Only 1 big part
-            let spline = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, intersection_option)?;
+            let spline = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, intersection_option, retract_ratio)?;
             compound_path.add_spline(spline);
         } else {
             // S-shape detected
@@ -217,8 +217,8 @@ impl CurveInterpolator {
             let from_side_normal = if from_tangent.dot(normal) > 0.0 {normal} else {-normal};
             let to_side_normal = -from_side_normal;
             // Calculate the two parts of the curve, recalculating the intersections
-            let from_side_curve = self.calculate_part_curve(from_point, from_tangent, mid_point, from_side_normal, None)?;
-            let to_side_curve = self.calculate_part_curve(mid_point, to_side_normal, to_point, to_tangent, None)?;
+            let from_side_curve = self.calculate_part_curve(from_point, from_tangent, mid_point, from_side_normal, None, retract_ratio)?;
+            let to_side_curve = self.calculate_part_curve(mid_point, to_side_normal, to_point, to_tangent, None, retract_ratio)?;
 
             compound_path.add_spline(from_side_curve);
             compound_path.add_spline(to_side_curve);
@@ -229,7 +229,7 @@ impl CurveInterpolator {
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     /// 'intersection_option' is only to avoid unnecessary recalculation.
-    fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>) -> Option<Spline> {
+    fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, intersection_option: Option<PointF64>, retract_ratio: f64) -> Option<Spline> {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;
         // Take or recalculate
         
@@ -248,9 +248,10 @@ impl CurveInterpolator {
                 control_point = point + tangent.get_normalized() * scaled_base_length
             }
 
+            // Push the control point inwards
             let mut i: usize = 100; // Limit the number of iterations
             while !self.hole_rect.have_point_on_boundary_or_inside(control_point.to_point_i32()) && i > 0 {
-                control_point = calculate_midpoint(point, control_point);
+                control_point = calculate_in_between_point(point, control_point, retract_ratio);
                 i -= 1;
             }
 

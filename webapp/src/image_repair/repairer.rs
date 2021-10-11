@@ -77,7 +77,8 @@ impl Repairer {
                 let curve_interpolator_config = CurveInterpolatorConfig::default();
                 let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, self.hole_rect, self.draw_util.clone());
                 
-                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false) {
+                let control_points_retract_ratio = 1.0 / 1.618;
+                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false, control_points_retract_ratio) {
                     interpolated_curves.push(interpolated_curve);
                 } else {
                     // A curve cannot be interpolated, this matching is wrong

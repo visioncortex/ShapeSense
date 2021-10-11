@@ -8,8 +8,20 @@ fn f64_approximately(a: f64, b: f64) -> bool {
     (a - b).abs() <= f64::EPSILON
 }
 
+/// ratio : returned point
+/// 
+/// 0 : 'from'
+/// 
+/// 0.5 : midpoint
+/// 
+/// 1 : 'to'
+pub fn calculate_in_between_point(from: PointF64, to: PointF64, ratio: f64) -> PointF64 {
+    let dir = to - from;
+    from + dir * ratio
+}
+
 pub fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
-    p1 * 0.5 + p2 * 0.5
+    calculate_in_between_point(p1, p2, 0.5)
 }
 
 // Given a line p1p2, returns its unit normal at right hand side.
