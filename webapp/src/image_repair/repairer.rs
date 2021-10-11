@@ -187,7 +187,7 @@ impl Repairer {
     fn try_interpolate_with_matchings(matchings: &[Matching], path_segments: &[PathI32], hole_rect: BoundingRect, draw_util: &DrawUtil, correct_tail_tangents: bool) -> bool {
         let mut drawn = false;
 
-        'matching_loop: for matching in matchings.into_iter() {
+        'matching_loop: for matching in matchings.iter() {
             let mut interpolated_curves = vec![];
             for &(index1, index2) in matching.iter() {
                 let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());

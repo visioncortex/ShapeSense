@@ -31,10 +31,15 @@ pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
     PointF64::new(-dy, dx).get_normalized()
 }
 
-// Given directed lines p1p2 and p3p4, returns their intersection only if it is in the positive direction.
-// If the two lines coincide or are parallel, returns the mid-pt of p2 and p3.
-// If the intersection of the lines is not in the positive direction, returns none.
-pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> Option<PointF64> {
+pub enum LineIntersectionResult {
+    Intersect(PointF64), // The segments can be extended in the positive directions to intersect at this point
+    Parallel, // No intersection at all
+    Coincidence, // Infinite intersections (extended or not)
+    None, // No intersection in the positive directions
+}
+
+// Given directed lines p1p2 and p3p4, returns their intersection result.
+pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> LineIntersectionResult {
     let extract_coords = |p: &PointF64| {(p.x, p.y)};
     let (x1, y1) = extract_coords(&p1);
     let (x2, y2) = extract_coords(&p2);
@@ -44,23 +49,23 @@ pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: Poin
     // Calculate u_a and u_b
     // u_a parametrizes p1p2 and u_b parametrizes p3p4
     let denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
-    if f64_approximately(denom, 0.0) { // Parallel check
-        return Some(calculate_midpoint(p2, p3));
-    }
     let numera_a = (x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3);
     let numera_b = (x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3);
     // All of denom, numera_a and numera_b are 0
-    if f64_approximately(denom + numera_a + numera_b, 0.0) { // Coincidence check
-        return Some(calculate_midpoint(p2, p3));
+    if f64_approximately(denom + numera_a + numera_b, 0.0) {
+        return LineIntersectionResult::Coincidence;
+    }
+    if f64_approximately(denom, 0.0) {
+        return LineIntersectionResult::Parallel;
     }
     let u_a = numera_a / denom;
     let u_b = numera_b / denom;
 
     // Positive direction check
     if u_a.is_sign_positive() && u_b.is_sign_positive() {
-        Some(PointF64::new(x1 + u_a * (x2 - x1), y1 + u_a * (y2 - y1)))
+        LineIntersectionResult::Intersect(PointF64::new(x1 + u_a * (x2 - x1), y1 + u_a * (y2 - y1)))
     } else {
-        None
+        LineIntersectionResult::None
     }    
 }
 
