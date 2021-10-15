@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}};
+use std::{collections::{HashMap, HashSet}, convert::TryInto};
 
 use permutator::{Combination, factorial, multiply_factorial};
 use visioncortex::PointF64;
@@ -41,10 +41,10 @@ impl Matcher {
         let indices: Vec<usize> = (0..len).into_iter().collect();
 
         // nCr
-        let (n, r) = (len, len >> 1);
+        let (n, r): (u64, u64) = (len as u64, (len >> 1) as u64);
         let num_combinations = factorial(n) / multiply_factorial(r, n-r);
         // Only interested in the first half of the nCr space (second half is equivalent)
-        let matchings_with_variances: Vec<(Matching, f64)> = indices.combination(r).take(num_combinations >> 1).map(|set1_indices| {
+        let matchings_with_variances: Vec<(Matching, f64)> = indices.combination(r.try_into().unwrap()).take((num_combinations >> 1).try_into().unwrap()).map(|set1_indices| {
                 let set1_indices: HashSet<usize> = set1_indices.into_iter().copied().collect();
                 let (mut set1, mut set2) = (MatchItemSet::new(), MatchItemSet::new());
                 for i in 0..len {

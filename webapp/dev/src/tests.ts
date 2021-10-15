@@ -308,6 +308,10 @@ shapeTestInputs.set("shape4", [
         canvasId: "long hole 7",
         holeRect: { x: 15, y: 155, w: 200, h: 40 },
     },
+    {
+        canvasId: "Left half",
+            holeRect: { x: 15, y: 30, w: 100, h: 200 },
+    },
 ]);
 
 
@@ -359,5 +363,32 @@ shapeTestInputs.set("shape5", [
     {
         canvasId: "left half (1) adversarial",
         holeRect: { x: 20, y: 15, w: 60, h: 170 },
+    },
+]);
+
+shapeTestInputs.set("shape6", [
+    {
+        canvasId: "horizontal long 1",
+        holeRect: { x: 5, y: 20, w: 120, h: 20 },
+    },
+    {
+        canvasId: "horizontal long 2",
+        holeRect: { x: 5, y: 45, w: 120, h: 20 },
+    },
+    {
+        canvasId: "horizontal long 3",
+        holeRect: { x: 5, y: 70, w: 120, h: 20 },
+    },
+    {
+        canvasId: "vertical long 1",
+        holeRect: { x: 20, y: 5, w: 20, h: 95 },
+    },
+    {
+        canvasId: "vertical long 2",
+        holeRect: { x: 50, y: 5, w: 20, h: 95 },
+    },
+    {
+        canvasId: "vertical long 3",
+        holeRect: { x: 80, y: 5, w: 20, h: 95 },
     },
 ]);
