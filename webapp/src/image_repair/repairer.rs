@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPathElement, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
+use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::console_log_util};
@@ -45,7 +45,7 @@ impl Repairer {
 
     pub fn repair(&self) {
         //# Path walking
-        let paths = self.get_paths();
+        let paths = self.get_test_paths();
 
         //# Path identification, segmentation, and simplification
         let simplify_tolerance = 2.0;
@@ -67,38 +67,27 @@ impl Repairer {
 
 // Test-specific helper functions
 impl Repairer {
-    fn get_paths(&self) -> Vec<PathI32> {
-        // Clustering
-        let runner_config = RunnerConfig {
-            diagonal: false,
-            hierarchical: 64,
-            batch_size: 25600,
-            good_min_area: 1,
-            good_max_area: self.image.width * self.image.height,
-            is_same_color_a: 4,
-            is_same_color_b: 1,
-            deepen_diff: 0,
-            hollow_neighbours: 1,
-            key_color: Color::color(&ColorName::White),
-        };
-        let runner = Runner::new(runner_config, self.image.clone());
-        let clusters = runner.run();
-        let clusters_view = clusters.view();
+    // Assume object shape is red
+    fn get_test_paths(&self) -> Vec<PathI32> {
+        let binary_image = self.image.to_binary_image(|c| {
+            // console_log_util(format!("{:?}", c));
+            c.r as usize > c.g as usize + c.b as usize
+        });
+        
+        let clusters = binary_image.to_clusters(false);
 
-        // Path walking
-        clusters_view.clusters.iter().filter_map(|cluster| {
-            let image = cluster.to_image(&clusters_view);
-            let mut path = PathI32::image_to_path(&image, true, visioncortex::PathSimplifyMode::None);
-
-            if path.len() <= 5 {
-                None
-            } else {
-                // Apply offset to get coords in original image
-                let offset = PointI32::new(cluster.rect.left, cluster.rect.top);
-                path.offset(&offset);
-                Some(path)
-            }
-        }).collect()
+        clusters
+            .into_iter()
+            .map(|cluster| {
+                let origin = PointI32::new(cluster.rect.left, cluster.rect.top);
+                let mut paths = Cluster::image_to_paths(&cluster.to_binary_image(), visioncortex::PathSimplifyMode::None);
+                paths
+                    .iter_mut()
+                    .for_each(|path| { path.offset(&origin) });
+                paths
+            })
+            .flatten()
+            .collect()
     }
 
     fn find_simplified_segments_from_paths(&self, paths: Vec<PathI32>, simplify_tolerance: f64) -> Vec<PathI32> {
