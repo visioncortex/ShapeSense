@@ -279,6 +279,16 @@ impl CurveInterpolator {
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     /// 'intersection_result' is only to avoid unnecessary recalculation.
     fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, whole_intersection_result: LineIntersectionResult, retract_ratio: f64) -> Option<Spline> {
+        let retract_control_point = |from_point: PointF64, mut control_point: PointF64| {
+            // Push the control point inwards
+            let mut i: usize = 1000; // Limit the number of iterations
+            while !self.hole_rect.have_point_on_boundary_or_inside(control_point.to_point_i32()) && i > 0 {
+                control_point = calculate_in_between_point(from_point, control_point, retract_ratio);
+                i -= 1;
+            }
+            control_point
+        };
+        
         let calculate_control_points = |intersection: PointF64| {
             let scaled_base_length = from_point.distance_to(to_point) * 2.0;
 
@@ -286,22 +296,13 @@ impl CurveInterpolator {
             let length_to_and_intersection = to_point.distance_to(intersection);
 
             let evaluate_control_point = |point: PointF64, tangent:PointF64, length_with_intersection: f64| {
-                let mut control_point;
-
-                if scaled_base_length > length_with_intersection * 0.5 {
-                    control_point = calculate_midpoint(point, intersection)
+                let control_point = if scaled_base_length > length_with_intersection * 0.5 {
+                    calculate_midpoint(point, intersection)
                 } else {
-                    control_point = point + tangent * scaled_base_length
-                }
+                    point + tangent * scaled_base_length
+                };
 
-                // Push the control point inwards
-                let mut i: usize = 100; // Limit the number of iterations
-                while !self.hole_rect.have_point_on_boundary_or_inside(control_point.to_point_i32()) && i > 0 {
-                    control_point = calculate_in_between_point(point, control_point, retract_ratio);
-                    i -= 1;
-                }
-
-                control_point
+                retract_control_point(point, control_point)
             };
             let control_point1 = evaluate_control_point(from_point, from_tangent, length_from_and_intersection);
             let control_point2 = evaluate_control_point(to_point, to_tangent, length_to_and_intersection);
@@ -311,7 +312,10 @@ impl CurveInterpolator {
         
         let (control_point1, control_point2) = match whole_intersection_result {
             LineIntersectionResult::Intersect(intersection) => calculate_control_points(intersection),
-            LineIntersectionResult::Parallel => (from_point + from_tangent, to_point + to_tangent),
+            LineIntersectionResult::Parallel => (
+                retract_control_point(from_point, from_point + from_tangent),
+                retract_control_point(to_point, to_point + to_tangent)
+            ),
             LineIntersectionResult::Coincidence => panic!("Part curves do not handle coincidence."),
             LineIntersectionResult::None => {
                 // Whole curve has been divided -> recalculate intersection

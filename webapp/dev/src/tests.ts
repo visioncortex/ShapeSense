@@ -282,7 +282,7 @@ shapeTestInputs.set("shape4", [
     },
     {
         canvasId: "long hole 1",
-        holeRect: { x: 15, y: 35, w: 200, h: 90 },
+        holeRect: { x: 15, y: 30, w: 200, h: 90 },
     },
     {
         canvasId: "long hole 2 (adversarial?)",
