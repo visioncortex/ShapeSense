@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
+use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPathElement, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::console_log_util};
@@ -59,11 +59,7 @@ impl Repairer {
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments);
-        console_log_util(format!("{:?}", match_item_set));
-
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
-
-        console_log_util(format!("{:?}", matchings));
 
         let mut correct_tail_tangents = false;
         if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
@@ -220,8 +216,21 @@ impl Repairer {
                 continue 'matching_loop;
             }
 
+            if draw_util.display_control_points {
+                let color = Color::color(&ColorName::Black);
+                interpolated_curves.iter().for_each(|curve| {
+                    curve.iter().for_each(|part| {
+                        if let CompoundPathElement::Spline(part) = part {
+                            draw_util.draw_cross_i32(&color, part.points[1].to_point_i32());
+                            draw_util.draw_cross_i32(&color, part.points[2].to_point_i32());
+                        }
+                    });
+                });
+            }
+
             // If all curves can be interpolated without problems, draw them
             interpolated_curves.into_iter().for_each(|interpolated_curve| {
+
                 draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
             });
             drawn = true;
