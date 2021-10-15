@@ -1,6 +1,7 @@
 use std::f64::consts::PI;
 
-use visioncortex::{PathF64, PointF64};
+use flo_curves::{Coord2, Coordinate, bezier::{Curve, curve_intersects_curve_clip}};
+use visioncortex::{CompoundPath, CompoundPathElement, PathF64, PointF64, Spline};
 
 // Geometry helper functions
 
@@ -141,4 +142,61 @@ pub fn find_new_point_from_4_point_scheme(
 
     // Point out from mid_out
     mid_out + vector_out.get_normalized() * new_magnitude
+}
+
+/// Determine if any curves in one of the compound paths intersect with another curve in another compound path.
+/// Assume that no curves within any single compound path intersect with each other.
+/// The behavior is undefined unless all elements in all compound paths are Spline and contain exactly 1 curve.
+pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
+    // Assertion
+    compound_curves.iter().for_each(|compound_curve| {
+        compound_curve.iter().for_each(|curve| {
+            if let CompoundPathElement::Spline(curve) = curve {
+                assert_eq!(curve.num_curves(), 1);
+            } else {
+                panic!("Not all compound paths are Spline.");
+            }
+        })
+    });
+
+    let single_spline_to_curve = |spline: &Spline| {
+        let coords: Vec<Coord2> = spline.points.iter().map(|p| Coord2::from_components(&[p.x, p.y])).collect();
+        Curve {
+            start_point: coords[0],
+            end_point: coords[3],
+            control_points: (coords[1], coords[2])
+        }
+    };
+
+    // Convert to a type that is easier to work with
+    let compound_curves: Vec<Vec<Curve<Coord2> > > = compound_curves.iter()
+                                         .map(|compound_curve| {
+                                            compound_curve.iter().filter_map(|curve| {
+                                                if let CompoundPathElement::Spline(curve) = curve { Some(single_spline_to_curve(curve)) } else { None }
+                                            }).collect()
+                                         })
+                                         .collect();
+
+    let two_curves_intersect = |curve1: &Curve<Coord2>, curve2: &Curve<Coord2>| {
+        let base_length = |curve: &Curve<Coord2>| { curve.start_point.distance_to(&curve.end_point) };
+        let accuracy = (base_length(curve1) + base_length(curve2)) * 0.25;
+
+        !curve_intersects_curve_clip(curve1, curve2, accuracy).is_empty()
+    };
+
+    // Pair-wise checking of intersection
+    // If any pair intersects, return true, else false
+    compound_curves.iter().enumerate().any(|(i, curves_i)| {
+        curves_i.iter()
+                .any(|curve_i| {
+                    compound_curves.iter()
+                                   .skip(i+1)
+                                   .any(|curves_j| {
+                                        curves_j.iter()
+                                                .any(|curve_j| {
+                                                    two_curves_intersect(curve_i, curve_j)
+                                                })
+                                   })
+                })
+    })
 }

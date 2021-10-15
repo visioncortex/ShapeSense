@@ -17,6 +17,7 @@ default = ["console_error_panic_hook"]
 bit-vec = "0.6"
 cfg-if = "0.1"
 console_log = { version = "0.2", features = ["color"] }
+flo_curves = "0.5.1"
 hungarian = "1.1.1"
 permutator = "0.4.0"
 visioncortex = { path = "../visioncortex" }

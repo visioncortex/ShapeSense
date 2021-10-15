@@ -265,7 +265,11 @@ impl CurveInterpolator {
                     cut_curve_into_two_and_insert(&mut compound_path)?;
                 }
             },
-            LineIntersectionResult::Coincidence => compound_path.add_path_f64(PathF64::from_points(vec![from_point, to_point])), // Just a straight line
+            LineIntersectionResult::Coincidence => {
+                // Just a straight line
+                let line = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, LineIntersectionResult::Intersect(calculate_midpoint(from_point, to_point)), retract_ratio)?;
+                compound_path.add_spline(line);
+            },
             LineIntersectionResult::None => { cut_curve_into_two_and_insert(&mut compound_path)?; },
         };
 

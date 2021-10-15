@@ -4,7 +4,7 @@ use bit_vec::BitVec;
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, PathI32, PointI32, color_clusters::{Runner, RunnerConfig}};
 use wasm_bindgen::prelude::*;
 
-use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher}, util::console_log_util};
+use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::console_log_util};
 
 use super::{Matching, draw::{DisplaySelector, DrawUtil}};
 
@@ -59,11 +59,15 @@ impl Repairer {
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments);
+        console_log_util(format!("{:?}", match_item_set));
+
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
-        let correct_tail_tangents = false;
+        console_log_util(format!("{:?}", matchings));
+
+        let mut correct_tail_tangents = false;
         if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
-            let correct_tail_tangents = true;
+            correct_tail_tangents = true;
             if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
                 panic!("Still not drawn!");
             }
@@ -121,7 +125,8 @@ impl Repairer {
             let next = (i + 1) % len;
 
             is_boundary_mask[i] && // itself is on boundary
-            !(is_boundary_mask[prev] && is_boundary_mask[next]) // not both neighbors are on boundary
+            // If both neighbors are on boundary, it is a degenerate case (corner intersection) where there is no endpoints pair.
+            ((is_boundary_mask[prev] && !is_boundary_mask[next]) || (!is_boundary_mask[prev] && is_boundary_mask[next]))
         });
 
         endpoints_iter.filter_map(|endpoint| {
@@ -142,7 +147,7 @@ impl Repairer {
         let len = path.len();
         let prev = if endpoint_index == 0 {len-1} else {endpoint_index-1};
         let next = (endpoint_index + 1) % len;
-        assert!(is_boundary_mask[prev] != is_boundary_mask[next]);
+        assert!(is_boundary_mask[prev] != is_boundary_mask[next]); // Only one side is boundary, not degenerate corner case
         let direction = if is_boundary_mask[prev] {1} else {-1};
 
         // Walk from 'endpoint_index' along 'path' by 'direction'
@@ -210,6 +215,11 @@ impl Repairer {
                     continue 'matching_loop;
                 }
             }
+            // Check if any curves intersect with each other
+            if bezier_curves_intersection(&interpolated_curves) {
+                continue 'matching_loop;
+            }
+
             // If all curves can be interpolated without problems, draw them
             interpolated_curves.into_iter().for_each(|interpolated_curve| {
                 draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
