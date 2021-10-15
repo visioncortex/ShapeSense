@@ -49,13 +49,7 @@ impl Repairer {
 
         //# Path identification, segmentation, and simplification
         let simplify_tolerance = 2.0;
-        let mut endpoints = HashSet::new();
-        let path_segments: Vec<PathI32> = paths.into_iter()
-                                               .map(|path| {
-                                                   self.find_segments_on_path_with_unique_endpoints(path, &mut endpoints, simplify_tolerance)
-                                               })
-                                               .flatten()
-                                               .collect();
+        let path_segments = self.find_simplified_segments_from_paths(paths, simplify_tolerance);
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments);
@@ -105,6 +99,17 @@ impl Repairer {
                 Some(path)
             }
         }).collect()
+    }
+
+    fn find_simplified_segments_from_paths(&self, paths: Vec<PathI32>, simplify_tolerance: f64) -> Vec<PathI32> {
+        let mut endpoints = HashSet::new();
+        paths
+            .into_iter()
+            .map(|path| {
+                self.find_segments_on_path_with_unique_endpoints(path, &mut endpoints, simplify_tolerance)
+            })
+            .flatten()
+            .collect()
     }
 
     /// Return a vector of *simplified* path segments whose heads are endpoints, pointing outwards from hole_rect.
