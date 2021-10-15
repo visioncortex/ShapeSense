@@ -169,7 +169,7 @@ pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
     };
 
     // Convert to a type that is easier to work with
-    let compound_curves: Vec<Vec<Curve<Coord2> > > = compound_curves.iter()
+    let curves_vec: Vec<Vec<Curve<Coord2> > > = compound_curves.iter()
                                          .map(|compound_curve| {
                                             compound_curve.iter().filter_map(|curve| {
                                                 if let CompoundPathElement::Spline(curve) = curve { Some(single_spline_to_curve(curve)) } else { None }
@@ -186,17 +186,13 @@ pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
 
     // Pair-wise checking of intersection
     // If any pair intersects, return true, else false
-    compound_curves.iter().enumerate().any(|(i, curves_i)| {
-        curves_i.iter()
-                .any(|curve_i| {
-                    compound_curves.iter()
-                                   .skip(i+1)
-                                   .any(|curves_j| {
-                                        curves_j.iter()
-                                                .any(|curve_j| {
-                                                    two_curves_intersect(curve_i, curve_j)
-                                                })
-                                   })
+    curves_vec.iter().enumerate().any(|(i, curves_i)| {
+        curves_i.iter().any(|curve_i| {
+            curves_vec.iter().skip(i+1).any(|curves_j| {
+                curves_j.iter().any(|curve_j| {
+                    two_curves_intersect(curve_i, curve_j)
                 })
+            })
+        })
     })
 }
