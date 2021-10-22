@@ -314,7 +314,6 @@ shapeTestInputs.set("shape4", [
     },
 ]);
 
-
 shapeTestInputs.set("shape5", [
     {
         canvasId: "top left",
