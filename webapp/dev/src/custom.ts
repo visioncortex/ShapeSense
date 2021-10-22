@@ -2,7 +2,8 @@ import { TestInput } from './tests';
 import { process, originalCanvas } from ".";
 import { DrawingCanvas } from "./canvas";
 
-let fileInput: HTMLInputElement, testCanvas: DrawingCanvas, holeWidthInput: HTMLInputElement, holeHeightInput: HTMLInputElement;
+let fileInput: HTMLInputElement, testCanvas: DrawingCanvas;
+let holeXInput: HTMLInputElement, holeYInput: HTMLInputElement, holeWidthInput: HTMLInputElement, holeHeightInput: HTMLInputElement;
 let imageSrc: string;
 
 let processCounter = 0;
@@ -10,22 +11,14 @@ let processCounter = 0;
 const clipValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 function getTestInput(): TestInput {
-    let { x, y } = testCanvas.lastMousePosition;
-    if (x === NaN || y === NaN) {
-        console.log("Last mouse position is NaN. Using default values...");
-        ({ x, y } = testCanvas.center());
-    }
+    let x = parseInt(holeXInput.value, 10);
+    let y = parseInt(holeYInput.value, 10);
 
     let w = parseInt(holeWidthInput.value, 10);
     let h = parseInt(holeHeightInput.value, 10);
-    if (w === NaN || h === NaN) {
-        console.log("Hole width/height is NaN. Using default values...");
-        ([w, h] = [15, 15]);
-    }
 
-    const [canvasWidth, canvasHeight] = [testCanvas.width(), testCanvas.height()];
-    x = Math.round(clipValue(x - w/2, 0, canvasWidth - w));
-    y = Math.round(clipValue(y - h/2, 0, canvasHeight - h));
+    holeXInput.value = x.toString(10);
+    holeYInput.value = y.toString(10);
 
     return {
         canvasId: "testCanvas",
@@ -42,11 +35,29 @@ async function loadImageWithImageSrc() {
     holeHeightInput.value = Math.round(height*0.3).toString(10);
 }
 
+function runTest() {
+    testCanvas.loadImage(imageSrc)
+        .then(() => {
+            const testInput = getTestInput();
+            return process(testCanvas, testInput);
+        })
+        .then(({ testInput, success }) => {
+            if (!success) {
+                console.error(`Test #${processCounter} failed.\nTest input is as follows:`);
+                console.dir(testInput);
+            }
+            processCounter += 1;
+        })
+        .catch(console.error);
+}
+
 export function setUpCustomTest() {
     fileInput = document.getElementById("fileInput") as HTMLInputElement;
     testCanvas = new DrawingCanvas("testCanvas");
     holeWidthInput = document.getElementById("holeWidthInput") as HTMLInputElement;
     holeHeightInput = document.getElementById("holeHeightInput") as HTMLInputElement;
+    holeXInput = document.getElementById("holeXInput") as HTMLInputElement;
+    holeYInput = document.getElementById("holeYInput") as HTMLInputElement;
 
     // Handle file upload
     fileInput.addEventListener("change", function (event) {
@@ -62,29 +73,36 @@ export function setUpCustomTest() {
         }
     });
 
-    // Run the test
+    // Add listener to update input (x,y)
+    testCanvas.addUpdateLastMousePositionListener(({x, y}) => {
+        let w = parseInt(holeWidthInput.value, 10);
+        let h = parseInt(holeHeightInput.value, 10);
+
+        x = x - w/2;
+        y = y - h/2;
+
+        const [canvasWidth, canvasHeight] = [testCanvas.width(), testCanvas.height()];
+        x = Math.round(clipValue(x, 0, canvasWidth - w));
+        y = Math.round(clipValue(y, 0, canvasHeight - h));
+
+        holeXInput.value = x.toString(10);
+        holeYInput.value = y.toString(10);
+    });
+
+    // Run the test on button press
+    document.getElementById("runTestButton").onclick = (_) => runTest();
+
+    // Run the test on mouse events
     {
-    const runTest = (_: MouseEvent) => {
+    const onmouse = (_: MouseEvent) => {
         if (!testCanvas.isKeyDown) {
             return;
         }
 
-        testCanvas.loadImage(imageSrc)
-            .then(() => {
-                const testInput = getTestInput();
-                return process(testCanvas, testInput);
-            })
-            .then(({testInput, success}) => {
-                if (!success) {
-                    console.error(`Test #${processCounter} failed.\nTest input is as follows:`);
-                    console.dir(testInput);
-                }
-                processCounter += 1;
-            })
-            .catch(console.error);
+        runTest();
     };
-    testCanvas.canvas.addEventListener("mousemove", runTest);
-    testCanvas.canvas.addEventListener("mousedown", runTest);
+    testCanvas.canvas.addEventListener("mousemove", onmouse);
+    testCanvas.canvas.addEventListener("mousedown", onmouse);
     }
 
     // Impose constraint on inputs

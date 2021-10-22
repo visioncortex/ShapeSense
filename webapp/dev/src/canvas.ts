@@ -5,6 +5,7 @@ export class DrawingCanvas {
     ctx: CanvasRenderingContext2D;
     holeRect?: {x: number, y: number, w: number, h: number};
     lastMousePosition: {x: number, y: number} = {x: NaN, y: NaN};
+    onUpdateLastMousePosition: Array<(lastMousePosition: {x: number, y: number}) => void> = [];
     isKeyDown: boolean = false;
 
     constructor(canvasId: string) {
@@ -24,6 +25,10 @@ export class DrawingCanvas {
                 x: (event.clientX - rect.left) / (rect.right - rect.left) * this.canvas.width,
                 y: (event.clientY - rect.top) / (rect.bottom - rect.top) * this.canvas.height
             };
+
+            for (let listener of this.onUpdateLastMousePosition) {
+                listener(this.lastMousePosition);
+            }
         }
         this.canvas.addEventListener("mousemove", setLastMousePosition);
         this.canvas.addEventListener("mousedown", setLastMousePosition);
@@ -81,5 +86,9 @@ export class DrawingCanvas {
         const repairer = new Repairer(this.ctx.canvas.id, displaySelector, displayTangents, displayControlPoints, this.holeRect.x, this.holeRect.y, this.holeRect.w, this.holeRect.h);
         repairer.repair();
         repairer.free();
+    }
+
+    addUpdateLastMousePositionListener(listener: (lastMousePosition: { x: number, y: number }) => void) {
+        this.onUpdateLastMousePosition.push(listener);
     }
 }
