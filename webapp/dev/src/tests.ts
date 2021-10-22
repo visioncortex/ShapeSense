@@ -391,4 +391,63 @@ shapeTestInputs.set("shape6", [
         canvasId: "vertical long 3",
         holeRect: { x: 80, y: 5, w: 20, h: 95 },
     },
+    {
+        canvasId: "horizontal short 1",
+        holeRect: { x: 5, y: 45, w: 60, h: 20 },
+    },
+    {
+        canvasId: "horizontal short 2",
+        holeRect: { x: 65, y: 45, w: 60, h: 20 },
+    },
+    {
+        canvasId: "horizontal short 3",
+        holeRect: { x: 65, y: 15, w: 60, h: 20 },
+    },
+    {
+        canvasId: "vertical short 1",
+        holeRect: { x: 50, y: 5, w: 20, h: 45 },
+    },
+    {
+        canvasId: "vertical short 2",
+        holeRect: { x: 50, y: 55, w: 20, h: 45 },
+    },
+    {
+        canvasId: "vertical short 3",
+        holeRect: { x: 70, y: 55, w: 20, h: 45 },
+    },
+]);
+
+shapeTestInputs.set("shape7", [
+    {
+        canvasId: "Test case 1",
+        holeRect: { x: 90, y: 20, w: 50, h: 20 },
+    },
+    {
+        canvasId: "Test case 2",
+        holeRect: { x: 105, y: 40, w: 50, h: 20 },
+    },
+    {
+        canvasId: "Test case 3",
+        holeRect: { x: 105, y: 60, w: 50, h: 20 },
+    },
+    {
+        canvasId: "Test case 4",
+        holeRect: { x: 95, y: 60, w: 80, h: 40 },
+    },
+    {
+        canvasId: "Test case 5",
+        holeRect: { x: 95, y: 90, w: 80, h: 40 },
+    },
+    {
+        canvasId: "Test case 6",
+        holeRect: { x: 95, y: 80, w: 80, h: 50 },
+    },
+    {
+        canvasId: "Test case 7",
+        holeRect: { x: 10, y: 80, w: 185, h: 25 },
+    },
+    {
+        canvasId: "Test case 8",
+        holeRect: { x: 10, y: 100, w: 185, h: 25 },
+    },
 ]);
