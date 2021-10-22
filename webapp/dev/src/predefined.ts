@@ -101,6 +101,7 @@ export async function runPredefinedTests() {
     const dummyPromise = Promise.resolve({canvasId: "", success: true});
     statusPromiseFactories.push(() => dummyPromise);
 
+    // Resolve promises in order
     statusPromiseFactories.reduce(
         async (promise, factory) => {
             return promise.then(

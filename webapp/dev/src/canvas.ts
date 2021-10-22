@@ -4,10 +4,29 @@ export class DrawingCanvas {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
     holeRect?: {x: number, y: number, w: number, h: number};
+    lastMousePosition: {x: number, y: number} = {x: NaN, y: NaN};
+    isKeyDown: boolean = false;
 
     constructor(canvasId: string) {
         this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         this.ctx = this.canvas.getContext("2d");
+
+        this.canvas.addEventListener("mousedown", (_) => this.isKeyDown = true);
+        this.canvas.addEventListener("mouseup", (_) => this.isKeyDown = false);
+
+        const setLastMousePosition = (event: MouseEvent) => {
+            if (!this.isKeyDown) {
+                return;
+            }
+
+            const rect = this.canvas.getBoundingClientRect();
+            this.lastMousePosition = {
+                x: (event.clientX - rect.left) / (rect.right - rect.left) * this.canvas.width,
+                y: (event.clientY - rect.top) / (rect.bottom - rect.top) * this.canvas.height
+            };
+        }
+        this.canvas.addEventListener("mousemove", setLastMousePosition);
+        this.canvas.addEventListener("mousedown", setLastMousePosition);
     }
 
     width() {

@@ -6,13 +6,11 @@
     <title>ImageRepairing Rust</title>
     <link href="./style.css" rel="stylesheet">
 </head>
-<body id="index">
-    <div id="panel">
+<body id="custom">
+    <div>
         <h3>Image Repairing in Rust</h3>
         <p>Background is dark, hole is white.</p>
-        <p>
-            <a href="./custom.html"><button>Custom Input</button></a>
-        </p>
+        <a href="index.html"><button>Index</button></a>
     </div>
     <div id="controls">
         <br>
@@ -28,11 +26,22 @@
         <input type="checkbox" id="displayControlPoints" /> <label for="displayControlPoints">Display control points</label>
         <br>
         <br>
+        <input type="file" id="fileInput" accept="image/*">
     </div>
     <div>
-        <canvas id="original" width="200px" height="300px"></canvas>
+        <canvas id="original"></canvas>
     </div>
-    <div id="canvasDiv">
+    <div id="testDiv">
+        <div id="testInput">
+            <p>Hole</p>
+            <label for="holeWidthInput">width</label> <input type="text" id="holeWidthInput" size="3" value="15">
+            
+            <label for="holeHeightInput">height</label> <input type="text" id="holeHeightInput" size="3" value="15">
+        </div>
+        <div>
+            <p>Interactive canvas</p>
+            <canvas id="testCanvas"></canvas>
+        </div>
     </div>
 </body>
 <script src="./bootstrap.js"></script>

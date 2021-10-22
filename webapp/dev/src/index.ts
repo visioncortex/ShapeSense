@@ -1,5 +1,6 @@
 import { DisplaySelector } from "image-repair";
 import { DrawingCanvas } from "./canvas";
+import { setUpCustomTest } from "./custom";
 import { runPredefinedTests } from "./predefined";
 import { TestInput } from "./tests";
 
@@ -19,7 +20,11 @@ const controls = ({
 const handleCheckboxChange = (checkboxElement: HTMLInputElement) => async (_: Event) => {
     const checked = checkboxElement.checked;
     controls[checkboxElement.id] = checked;
-    await runPredefinedTests();
+    switch (document.body.id) {
+        case "index":
+        case "shape":
+            await runPredefinedTests();
+    }
 };
 
 const controlsDiv = document.getElementById("controls");
@@ -51,7 +56,11 @@ for (let controlElem of Array.from(controlsDiv.children)) {
                     controls[selectElem.id] = DisplaySelector.Smoothed;
                     break;
             }
-            await runPredefinedTests();
+            switch (document.body.id) {
+                case "index":
+                case "shape":
+                    await runPredefinedTests();
+            }
         };
         continue;
     }
@@ -63,14 +72,14 @@ export const originalCanvas = new DrawingCanvas("original");
 export function process(canvas: DrawingCanvas, testInput: TestInput) {
     canvas.holeRect = testInput.holeRect;
 
-    let status: {canvasId: string, success: boolean};
+    let status: {testInput: TestInput, success: boolean};
     
     try {
         canvas.process(controls.displaySelector, controls.displayTangents, controls.displayControlPoints);
-        status = {canvasId: testInput.canvasId, success: true};
+        status = {testInput, success: true};
     } catch (e) {
         console.error(e);
-        status = {canvasId: testInput.canvasId, success: false};
+        status = {testInput, success: false};
     }
 
     return status;
@@ -80,6 +89,10 @@ switch (document.body.id) {
     case "index":
     case "shape":
         runPredefinedTests();
+        break;
+
+    case "custom":
+        setUpCustomTest();
         break;
 
     default:
