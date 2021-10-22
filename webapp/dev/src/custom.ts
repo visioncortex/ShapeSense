@@ -8,6 +8,8 @@ let imageSrc: string;
 
 let processCounter = 0;
 
+const initialHoleRect = { x: 10, y: 30, w: 40, h: 32 };
+
 const clipValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 function getTestInput(): TestInput {
@@ -26,13 +28,15 @@ function getTestInput(): TestInput {
     };
 }
 
-async function loadImageWithImageSrc() {
+async function loadImageWithImageSrc(setDimension: boolean = true) {
     await originalCanvas.loadImage(imageSrc);
     await testCanvas.loadImage(imageSrc);
 
     let [ width, height ] = [ testCanvas.width(), testCanvas.height() ];
-    holeWidthInput.value = Math.round(width*0.3).toString(10);
-    holeHeightInput.value = Math.round(height*0.3).toString(10);
+    if (setDimension) {
+        holeWidthInput.value = Math.round(width * 0.3).toString(10);
+        holeHeightInput.value = Math.round(height * 0.3).toString(10);
+    }
 }
 
 function runTest() {
@@ -118,7 +122,12 @@ export function setUpCustomTest() {
 
     // Set up initial case
     imageSrc = "./assets/shape6.png";
-    loadImageWithImageSrc().then(() => {
+    holeXInput.value = initialHoleRect.x.toString(10);
+    holeYInput.value = initialHoleRect.y.toString(10);
+    holeWidthInput.value = initialHoleRect.w.toString(10);
+    holeHeightInput.value = initialHoleRect.h.toString(10);
+
+    loadImageWithImageSrc(false).then(() => {
         process(testCanvas, getTestInput());
         console.clear();
     });
