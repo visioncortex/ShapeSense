@@ -53,7 +53,6 @@ impl Repairer {
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments);
-        console_log_debug_util(&match_item_set);
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
         let mut correct_tail_tangents = false;
@@ -71,7 +70,6 @@ impl Repairer {
     // Assume object shape is red
     fn get_test_paths(&self) -> Vec<PathI32> {
         let binary_image = self.image.to_binary_image(|c| {
-            // console_log_util(format!("{:?}", c));
             c.r as usize > c.g as usize + c.b as usize
         });
         
@@ -91,6 +89,7 @@ impl Repairer {
             .collect()
     }
 
+    // The larger the tolerance, the fewer points will be left in output path.
     fn find_simplified_segments_from_paths(&self, paths: Vec<PathI32>, simplify_tolerance: f64) -> Vec<PathI32> {
         let mut endpoints = HashSet::new();
         paths
@@ -225,7 +224,6 @@ impl Repairer {
 
             // If all curves can be interpolated without problems, draw them
             interpolated_curves.into_iter().for_each(|interpolated_curve| {
-
                 draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
             });
             drawn = true;

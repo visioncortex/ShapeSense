@@ -94,8 +94,10 @@ impl CurveInterpolator {
 
         if self.draw_util.display_tangents {
             let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
-            self.draw_util.draw_line_f64(&color1, endpoint1, endpoint1 + tail_tangent1.get_normalized() * tangent_visual_length);
-            self.draw_util.draw_line_f64(&color2, endpoint2, endpoint2 + tail_tangent2.get_normalized() * tangent_visual_length);
+            let to_point1 = endpoint1 + tail_tangent1.get_normalized() * tangent_visual_length;
+            let to_point2 = endpoint2 + tail_tangent2.get_normalized() * tangent_visual_length;
+            self.draw_util.draw_line_f64(&color1, endpoint1, to_point1);
+            self.draw_util.draw_line_f64(&color2, endpoint2, to_point2);
         }
         
         //# Curve interpolation
@@ -209,15 +211,15 @@ impl CurveInterpolator {
     /// Make sure the two tangents do not bend outwards
     fn correct_tail_tangents(point1: PointF64, mut tangent1: PointF64, point2: PointF64, mut tangent2: PointF64) -> (PointF64, PointF64) {
         let correct_tangent = |tangent: &mut PointF64, root_point: PointF64, segment_point: PointF64| {
-            let mut unit_normal = calculate_unit_normal_of_line(root_point, segment_point);
+            let mut unit_normal = calculate_unit_normal_of_line(root_point, segment_point); // RHS normal
             let root_to_segment = segment_point - root_point;
-            if tangent.dot(root_to_segment) < 0.0 {
+            if tangent.dot(root_to_segment).is_sign_negative() {
                 // 'tangent' is bent outwards
-                if tangent.dot(unit_normal) < 0.0 {
+                if tangent.dot(unit_normal).is_sign_negative() {
                     // Use the normal on the other side
                     unit_normal = -unit_normal;
                 }
-                *tangent = unit_normal * (root_point - segment_point).norm();
+                *tangent = unit_normal * root_to_segment.norm();
             }
             // Otherwise, 'tangent' is correct already
         };

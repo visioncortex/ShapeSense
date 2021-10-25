@@ -25,8 +25,8 @@ pub fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
     calculate_in_between_point(p1, p2, 0.5)
 }
 
-// Given a line p1p2, returns its unit normal at right hand side.
-// Note that the negative of the returned vector is the unit normal at left hand side.
+/// Given a line p1p2, returns its unit normal at right hand side.
+/// Note that the negative of the returned vector is the unit normal at left hand side.
 pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
     let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
     PointF64::new(-dy, dx).get_normalized()
