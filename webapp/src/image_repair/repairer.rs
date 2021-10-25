@@ -107,7 +107,7 @@ impl Repairer {
         let path = path.to_open();
         let len = path.len();
         let is_boundary_mask = BitVec::from_fn(len, |i| {
-            self.hole_rect.has_point_on_boundary(path[i])
+            self.hole_rect.have_point_on_boundary(path[i])
         });
 
         let endpoints_iter = (0..len).into_iter().filter(|&i| {
@@ -121,7 +121,7 @@ impl Repairer {
 
         endpoints_iter.filter_map(|endpoint| {
             let inserted = current_endpoints.insert(path[endpoint]);
-            if inserted && !self.hole_rect.has_point_at_corner(path[endpoint]) {
+            if inserted {
                 Some(self.walk_segment(&path, endpoint, &is_boundary_mask, simplify_tolerance))
             } else {
                 None
