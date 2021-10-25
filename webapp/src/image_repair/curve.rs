@@ -282,7 +282,7 @@ impl CurveInterpolator {
         let retract_control_point = |from_point: PointF64, mut control_point: PointF64| {
             // Push the control point inwards
             let mut i: usize = 1000; // Limit the number of iterations
-            while !self.hole_rect.have_point_on_boundary_or_inside(control_point.to_point_i32()) && i > 0 {
+            while !self.hole_rect.has_point_on_boundary_or_inside(control_point.to_point_i32()) && i > 0 {
                 control_point = calculate_in_between_point(from_point, control_point, retract_ratio);
                 i -= 1;
             }

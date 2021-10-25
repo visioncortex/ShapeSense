@@ -190,7 +190,7 @@ impl BoundingRect {
         self.bottom += p.y;
     }
 
-    pub fn have_point_on_boundary(&self, p: PointI32) -> bool {
+    pub fn has_point_on_boundary(&self, p: PointI32) -> bool {
         // On left or right bounds
         (p.x == self.left || p.x == self.right) && (self.top-1 <= p.y && p.y <= self.bottom+1)
             ||
@@ -198,14 +198,21 @@ impl BoundingRect {
         (p.y == self.top || p.y == self.bottom) && (self.left-1 <= p.x && p.x <= self.right+1)
     }
 
-    pub fn have_point_inside(&self, p: PointI32) -> bool {
+    pub fn has_point_inside(&self, p: PointI32) -> bool {
         (self.left < p.x && p.x < self.right)
         &&
         (self.top < p.y && p.y < self.bottom)
     }
 
-    pub fn have_point_on_boundary_or_inside(&self, p: PointI32) -> bool {
-        self.have_point_on_boundary(p) || self.have_point_inside(p)
+    pub fn has_point_on_boundary_or_inside(&self, p: PointI32) -> bool {
+        self.has_point_on_boundary(p) || self.has_point_inside(p)
+    }
+
+    /// Returns true iff p is one of the corners of this bounding rect
+    pub fn has_point_at_corner(&self, p: PointI32) -> bool {
+        (p.x == self.left || p.x == self.right)
+        &&
+        (p.y == self.top || p.y == self.bottom)
     }
 }
 
@@ -402,17 +409,17 @@ mod tests {
         let bottom_right = PointI32::new(rect.right, rect.bottom);
 
         // THEN its corners are on its boundary
-        assert!(rect.have_point_on_boundary(top_left));
-        assert!(rect.have_point_on_boundary(top_right));
-        assert!(rect.have_point_on_boundary(bottom_left));
-        assert!(rect.have_point_on_boundary(bottom_right));
+        assert!(rect.has_point_on_boundary(top_left));
+        assert!(rect.has_point_on_boundary(top_right));
+        assert!(rect.has_point_on_boundary(bottom_left));
+        assert!(rect.has_point_on_boundary(bottom_right));
 
         // THEN points inside are not on its boundary
-        assert!(!rect.have_point_on_boundary(top_left.translate(PointI32::new(1, 1))));
-        assert!(!rect.have_point_on_boundary(top_right.translate(PointI32::new(-1, 1))));
+        assert!(!rect.has_point_on_boundary(top_left.translate(PointI32::new(1, 1))));
+        assert!(!rect.has_point_on_boundary(top_right.translate(PointI32::new(-1, 1))));
 
         // THEN points outside are not on its boundary
-        assert!(!rect.have_point_on_boundary(bottom_left.translate(PointI32::new(-1, 1))));
-        assert!(!rect.have_point_on_boundary(bottom_right.translate(PointI32::new(-1, -1))));
+        assert!(!rect.has_point_on_boundary(bottom_left.translate(PointI32::new(-1, 1))));
+        assert!(!rect.has_point_on_boundary(bottom_right.translate(PointI32::new(-1, -1))));
     }
 }
