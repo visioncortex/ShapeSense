@@ -4,7 +4,7 @@ use bit_vec::BitVec;
 use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 use wasm_bindgen::prelude::*;
 
-use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::console_log_util};
+use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
 use super::{Matching, draw::{DisplaySelector, DrawUtil}};
 
@@ -53,6 +53,7 @@ impl Repairer {
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments);
+        console_log_debug_util(&match_item_set);
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
         let mut correct_tail_tangents = false;

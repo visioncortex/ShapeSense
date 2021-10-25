@@ -21,3 +21,9 @@ where T: Display
 {
     console::log_1(&content.to_string().into());
 }
+
+pub(crate) fn console_log_debug_util<T>(content: T)
+where T: std::fmt::Debug
+{
+    console_log_util(format!("{:?}", content));
+}

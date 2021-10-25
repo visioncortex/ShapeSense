@@ -8,7 +8,8 @@ let imageSrc: string;
 
 let processCounter = 0;
 
-const initialHoleRect = { x: 10, y: 30, w: 40, h: 32 };
+const initialHoleRect = { x: 43, y: 38, w: 40, h: 31 };
+const clearFirstOutput = false;
 
 const clipValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -120,6 +121,20 @@ export function setUpCustomTest() {
     holeHeightInput.onchange = onchange(holeHeightInput, testCanvas.height());
     }
 
+    // Set up export button
+    {
+    const onclick = (_: MouseEvent) => {
+        const link = document.createElement("a");
+        link.download = `x${holeXInput.value}_y${holeYInput.value}_w${holeWidthInput.value}_h${holeHeightInput.value}.png`;
+        testCanvas.canvas.toBlob((blob) => {
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }, "image/png");
+    };
+    let exportButton = document.getElementById("exportButton") as HTMLAnchorElement;
+    exportButton.onclick = onclick;
+    }
+
     // Set up initial case
     imageSrc = "./assets/shape6.png";
     holeXInput.value = initialHoleRect.x.toString(10);
@@ -129,6 +144,8 @@ export function setUpCustomTest() {
 
     loadImageWithImageSrc(false).then(() => {
         process(testCanvas, getTestInput());
-        console.clear();
+        if (clearFirstOutput) {
+            console.clear();
+        }
     });
 }

@@ -44,7 +44,12 @@ impl Matcher {
         let (n, r): (u64, u64) = (len as u64, (len >> 1) as u64);
         let num_combinations = factorial(n) / multiply_factorial(r, n-r);
         // Only interested in the first half of the nCr space (second half is equivalent)
-        let matchings_with_variances: Vec<(Matching, f64)> = indices.combination(r.try_into().unwrap()).take((num_combinations >> 1).try_into().unwrap()).map(|set1_indices| {
+        
+
+        // Keep unique matchings only
+        let mut unique_matchings_with_lowest_variances = HashMap::<Matching, f64>::new();
+        indices.combination(r.try_into().unwrap()).take((num_combinations >> 1).try_into().unwrap())
+            .map(|set1_indices| {
                 let set1_indices: HashSet<usize> = set1_indices.into_iter().copied().collect();
                 let (mut set1, mut set2) = (MatchItemSet::new(), MatchItemSet::new());
                 for i in 0..len {
@@ -63,24 +68,19 @@ impl Matcher {
 
                 (
                     Matching::from_pairs(index_matching.into_iter()
-                                                   .map(|(index1, index2)| {
-                                                       (set1[index1].id, set2[index2].id)
+                                                    .map(|(index1, index2)| {
+                                                        (set1[index1].id, set2[index2].id)
                                                     })
                                                     .collect()),
                     variance
                 )
             })
-            .collect();
-
-        // Keep unique matchings only
-        let mut unique_matchings_with_lowest_variances = HashMap::<Matching, f64>::new();
-        matchings_with_variances.into_iter()
-                                .for_each(|(matching, variance)| {
-                                    let current_variance = unique_matchings_with_lowest_variances.get(&matching).cloned().unwrap_or(f64::NAN);
-                                    if current_variance.is_nan() || variance < current_variance {
-                                        unique_matchings_with_lowest_variances.insert(matching, variance);
-                                    }
-                                });
+            .for_each(|(matching, variance)| {
+                let current_variance = unique_matchings_with_lowest_variances.get(&matching).cloned().unwrap_or(f64::NAN);
+                if current_variance.is_nan() || variance < current_variance {
+                    unique_matchings_with_lowest_variances.insert(matching, variance);
+                }
+            });
 
         // Convert to vec
         let mut matchings_with_variances: Vec<(Matching, f64)> = unique_matchings_with_lowest_variances.into_iter().collect();
