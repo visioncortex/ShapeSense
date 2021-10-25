@@ -97,7 +97,7 @@ pub fn signed_angle_difference(from: &f64, to: &f64) -> f64 {
 }
 
 /// Takes a path representing an arbitrary curve, returns a vector of bool representing its corners
-/// (angle in radians bigger or equal to than 'threshold').
+/// (angle in radians bigger than or equal to 'threshold').
 pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
     if path.is_empty() {
         return vec![];
