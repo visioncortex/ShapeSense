@@ -1,9 +1,12 @@
-use visioncortex::{BoundingRect, Color, ColorName, CompoundPath, PathF64, PointF64, Spline};
+use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
+use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::find_new_point_from_4_point_scheme, util::console_log_util};
 
 use super::{LineIntersectionResult, calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
 
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct CurveInterpolatorConfig {
     // Smoothing
     pub outset_ratio: f64,
@@ -11,8 +14,9 @@ pub struct CurveInterpolatorConfig {
     pub smooth_max_iterations: usize,
     pub corner_threshold: f64,
     // Tail tangent approx.
-    pub tail_tangent_n_points: usize, // [2, Inf]
+    pub tail_tangent_num_points: usize, // [2, Inf]
     pub tail_weight_multiplier: f64,
+    pub control_points_retract_ratio: f64,
 }
 
 impl Default for CurveInterpolatorConfig {
@@ -22,11 +26,14 @@ impl Default for CurveInterpolatorConfig {
             min_segment_length: 4.0,
             smooth_max_iterations: 2,
             corner_threshold: std::f64::consts::FRAC_PI_2,
-            tail_tangent_n_points: 5,
+            tail_tangent_num_points: 5,
             tail_weight_multiplier: 1.5,
+            control_points_retract_ratio: 1.0 / 1.618,
         }
     }
 }
+
+
 
 /// Interpolate in-between curve given 2 curves
 pub struct CurveInterpolator {
@@ -49,7 +56,7 @@ impl CurveInterpolator {
     /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, correct_tail_tangents: bool, control_points_retract_ratio: f64) -> Option<CompoundPath> {
+    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, correct_tail_tangents: bool) -> Option<CompoundPath> {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -80,7 +87,7 @@ impl CurveInterpolator {
         }
 
         //# Tail tangent approximation
-        let tail_tangent_n_points = self.config.tail_tangent_n_points;
+        let tail_tangent_n_points = self.config.tail_tangent_num_points;
         let tail_weight_multiplier = self.config.tail_weight_multiplier;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
         let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n_points, smooth_curve1_len), base_length, tail_weight_multiplier);
@@ -101,7 +108,7 @@ impl CurveInterpolator {
         }
         
         //# Curve interpolation
-        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, control_points_retract_ratio)
+        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, self.config.control_points_retract_ratio)
     }
 }
 

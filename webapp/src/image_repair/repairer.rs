@@ -1,12 +1,12 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
+use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
-use super::{Matching, draw::{DisplaySelector, DrawUtil}};
+use super::{Matching, RepairerConfig, draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
 pub struct Repairer {
@@ -18,13 +18,14 @@ pub struct Repairer {
 // WASM API
 #[wasm_bindgen]
 impl Repairer {
-    #[wasm_bindgen(constructor)]
-    pub fn new_from_canvas_id_and_mask(canvas_id: &str, display_selector: DisplaySelector, display_tangents: bool, display_control_points: bool, x: usize, y: usize, w: usize, h: usize) -> Self {
-        let draw_util = DrawUtil::new(canvas_id, display_selector, display_tangents, display_control_points);
+    pub fn repair_with_config(config: RepairerConfig) {
+        let draw_util = DrawUtil::new(config.get_canvas_id(), config.display_selector, config.display_tangents, config.display_control_points);
         let canvas = &draw_util.canvas;
 
         // Raw image
         let mut image = canvas.get_image_data_as_color_image(0, 0, canvas.width() as u32, canvas.height() as u32);
+
+        let (x, y, w, h) = (config.hole_left, config.hole_top, config.hole_width, config.hole_height);
 
         let hole_rect = BoundingRect::new_x_y_w_h(x as i32, y as i32, w as i32, h as i32);
 
@@ -40,32 +41,48 @@ impl Repairer {
         // Draw hole on canvas
         draw_util.fill_rect(&empty_color, x, y, w, h);
 
-        Self { image, hole_rect, draw_util }
-    }
+        let repairer = Self { image, hole_rect, draw_util };
 
-    pub fn repair(&self) {
+        repairer.repair(config.simplify_tolerance, config.curve_interpolator_config);
+    }
+}
+
+// API
+impl Repairer {
+    pub fn repair(&self, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) {
         //# Path walking
         let paths = self.get_test_paths();
 
         //# Path identification, segmentation, and simplification
-        let simplify_tolerance = 2.0;
         let path_segments = self.find_simplified_segments_from_paths(paths, simplify_tolerance);
+
+        if path_segments.is_empty() {
+            return;
+        }
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments);
         let matchings = Matcher::find_all_possible_matchings(match_item_set);
 
-        let mut correct_tail_tangents = false;
-        if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
+        let mut correct_tail_tangents = false; // First try interpolation without correcting tail tangents
+        let interpolated_curves = self.try_interpolate_with_matchings(
+            &matchings,
+            &path_segments,
+            curve_interpolator_config,
+            correct_tail_tangents
+        ).unwrap_or_else(|| {
             correct_tail_tangents = true;
-            if !Self::try_interpolate_with_matchings(&matchings, &path_segments, self.hole_rect, &self.draw_util, correct_tail_tangents) {
-                panic!("Still not drawn!");
-            }
-        }
+            self.try_interpolate_with_matchings(
+                &matchings,
+                &path_segments,
+                curve_interpolator_config,
+                correct_tail_tangents
+            ).unwrap_or_else(|| panic!("Still not interpolated."))
+        });
     }
 }
 
-// Test-specific helper functions
+// Helper functions
 impl Repairer {
     // Assume object shape is red
     fn get_test_paths(&self) -> Vec<PathI32> {
@@ -114,9 +131,10 @@ impl Repairer {
             let prev = if i == 0 {len-1} else {i-1};
             let next = (i + 1) % len;
 
-            is_boundary_mask[i] && // itself is on boundary
+            is_boundary_mask[i] // itself is on boundary
             // If both neighbors are on boundary, it is a degenerate case (corner intersection) where there is no endpoints pair.
-            ((is_boundary_mask[prev] && !is_boundary_mask[next]) || (!is_boundary_mask[prev] && is_boundary_mask[next]))
+            && ((is_boundary_mask[prev] && !is_boundary_mask[next]) || (!is_boundary_mask[prev] && is_boundary_mask[next]))
+
         });
 
         endpoints_iter.filter_map(|endpoint| {
@@ -179,26 +197,28 @@ impl Repairer {
     }
 
     /// Return true iff one of the matchings is successfully interpolated
-    fn try_interpolate_with_matchings(matchings: &[Matching], path_segments: &[PathI32], hole_rect: BoundingRect, draw_util: &DrawUtil, correct_tail_tangents: bool) -> bool {
-        let mut drawn = false;
+    fn try_interpolate_with_matchings(
+        &self,
+        matchings: &[Matching],
+        path_segments: &[PathI32],
+        curve_interpolator_config: CurveInterpolatorConfig,
+        correct_tail_tangents: bool // Not a configuration, but a fail-safe feature
+    ) -> Option<Vec<CompoundPath> > {
+        let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, self.hole_rect, self.draw_util.clone());
 
         'matching_loop: for matching in matchings.iter() {
             let mut interpolated_curves = vec![];
             for &(index1, index2) in matching.iter() {
                 let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
 
-                if draw_util.display_selector == DisplaySelector::Simplified {
+                if self.draw_util.display_selector == DisplaySelector::Simplified {
                     let color1 = Color::get_palette_color(1);
                     let color2 = Color::get_palette_color(3);
-                    draw_util.draw_path_f64(&color1, &curve1);
-                    draw_util.draw_path_f64(&color2, &curve2);
+                    self.draw_util.draw_path_f64(&color1, &curve1);
+                    self.draw_util.draw_path_f64(&color2, &curve2);
                 }
-
-                let curve_interpolator_config = CurveInterpolatorConfig::default();
-                let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, hole_rect, draw_util.clone());
                 
-                let control_points_retract_ratio = 1.0 / 1.618;
-                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents, control_points_retract_ratio) {
+                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents) {
                     interpolated_curves.push(interpolated_curve);
                 } else {
                     // A curve cannot be interpolated, this matching is wrong
@@ -210,27 +230,27 @@ impl Repairer {
                 continue 'matching_loop;
             }
 
-            if draw_util.display_control_points {
+            if self.draw_util.display_control_points {
                 let color = Color::color(&ColorName::Black);
                 interpolated_curves.iter().for_each(|curve| {
                     curve.iter().for_each(|part| {
                         if let CompoundPathElement::Spline(part) = part {
-                            draw_util.draw_cross_i32(&color, part.points[1].to_point_i32());
-                            draw_util.draw_cross_i32(&color, part.points[2].to_point_i32());
+                            self.draw_util.draw_cross_i32(&color, part.points[1].to_point_i32());
+                            self.draw_util.draw_cross_i32(&color, part.points[2].to_point_i32());
                         }
                     });
                 });
             }
 
             // If all curves can be interpolated without problems, draw them
-            interpolated_curves.into_iter().for_each(|interpolated_curve| {
-                draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
+            interpolated_curves.iter().for_each(|interpolated_curve| {
+                self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
             });
-            drawn = true;
+            
             // Trust it to be the correct solution
-            break;
+            return Some(interpolated_curves);
         }
 
-        drawn
+        None
     }
 }
