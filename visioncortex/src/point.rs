@@ -51,6 +51,30 @@ where
 
 impl<T> Point2<T>
 where
+    T: Add<Output = T> + Copy + Neg<Output = T> + Sub<Output = T>,
+{
+    #[inline]
+    /// Assumes a coordinate system with origin at the top-left. The behavior
+    /// is undefined otherwise.
+    pub fn rotate_90deg(&self, origin: Self, clockwise: bool) -> Self {
+        let o = origin;
+
+        if !clockwise {
+            Self {
+                x: (self.y - o.y) + o.x,
+                y: -(self.x - o.x) + o.y,
+            }
+        } else {
+            Self {
+                x: -(self.y - o.y) + o.x,
+                y: (self.x - o.x) + o.y,
+            }
+        }
+    }
+}
+
+impl<T> Point2<T>
+where
     T: Float,
 {
     #[inline]
@@ -301,5 +325,13 @@ mod tests {
         // should be close to PointF64 { x: 0.0, y: 1.0 }
         assert!(-0.000000001 < r.x && r.x < 0.000000001);
         assert!(1.0 - 0.000000001 < r.y && r.y < 1.0 + 0.000000001);
+    }
+
+    #[test]
+    /// rotate clockwise by 90 degrees
+    fn pointi32_rotate() {
+        let p = PointI32 { x: 1, y: 0 };
+        let r = p.rotate_90deg(PointI32::default(), true);
+        assert_eq!(PointI32::new(0, 1), r);
     }
 }

@@ -124,7 +124,7 @@ impl Repairer {
         let path = path.to_open();
         let len = path.len();
         let is_boundary_mask = BitVec::from_fn(len, |i| {
-            self.hole_rect.have_point_on_boundary(path[i])
+            self.hole_rect.have_point_on_boundary(path[i], 1)
         });
 
         let endpoints_iter = (0..len).into_iter().filter(|&i| {
