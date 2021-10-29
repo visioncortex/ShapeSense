@@ -1,16 +1,16 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{BoundingRect, Color, ColorImage, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
+use visioncortex::{BinaryImage, BoundingRect, Color, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
-use super::{Matching, RepairerConfig, draw::{DisplaySelector, DrawUtil}};
+use super::{HoleFiller, Matching, RepairerConfig, draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
 pub struct Repairer {
-    image: ColorImage,
+    image: BinaryImage,
     hole_rect: BoundingRect,
     draw_util: DrawUtil,
 }
@@ -23,7 +23,9 @@ impl Repairer {
         let canvas = &draw_util.canvas;
 
         // Raw image
-        let mut image = canvas.get_image_data_as_color_image(0, 0, canvas.width() as u32, canvas.height() as u32);
+        let mut image = canvas.get_image_data_as_color_image(0, 0, canvas.width() as u32, canvas.height() as u32).to_binary_image(|c| {
+            c.r as usize > c.g as usize + c.b as usize
+        });
 
         let (x, y, w, h) = (config.hole_left, config.hole_top, config.hole_width, config.hole_height);
 
@@ -34,7 +36,7 @@ impl Repairer {
         // Remove hole from image
         for x_offset in 0..hole_rect.width() {
             for y_offset in 0..hole_rect.height() {
-                image.set_pixel(x + x_offset as usize, y + y_offset as usize, &empty_color)
+                image.set_pixel(x + x_offset as usize, y + y_offset as usize, false)
             }
         }
 
@@ -79,18 +81,22 @@ impl Repairer {
                 correct_tail_tangents
             ).unwrap_or_else(|| panic!("Still not interpolated."))
         });
+
+        let endpoints: Vec<PointI32> = path_segments
+            .into_iter()
+            .map(|segment| segment[0])
+            .collect();
+
+        let filled_hole = HoleFiller::fill(&self.image, &self.hole_rect, interpolated_curves, endpoints);
+        self.draw_util.draw_filled_hole(filled_hole, PointI32::new(self.hole_rect.left, self.hole_rect.top));
     }
 }
 
 // Helper functions
 impl Repairer {
     // Assume object shape is red
-    fn get_test_paths(&self) -> Vec<PathI32> {
-        let binary_image = self.image.to_binary_image(|c| {
-            c.r as usize > c.g as usize + c.b as usize
-        });
-        
-        let clusters = binary_image.to_clusters(false);
+    fn get_test_paths(&self) -> Vec<PathI32> {        
+        let clusters = self.image.to_clusters(false);
 
         clusters
             .into_iter()
@@ -184,13 +190,14 @@ impl Repairer {
     /// The behavior is also undefined unless all segments have their tails at index 0.
     fn construct_match_item_set(&self, path_segments: &[PathI32]) -> MatchItemSet {
         assert_eq!(path_segments.len() % 2, 0);
-        let match_items_iter = path_segments.iter()
-                                            .map(|segment| {
-                                                assert!(segment.len() >= 2);
-                                                // 0 is tail
-                                                let direction = (segment[0] - segment[1]).to_point_f64().get_normalized();
-                                                MatchItem::new_with_default_id(segment[0].to_point_f64(), direction)
-                                            });
+        let match_items_iter = path_segments
+            .iter()
+            .map(|segment| {
+                assert!(segment.len() >= 2);
+                // 0 is tail
+                let direction = (segment[0] - segment[1]).to_point_f64().get_normalized();
+                MatchItem::new_with_default_id(segment[0].to_point_f64(), direction)
+            });
         let mut match_item_set = MatchItemSet::new();
         match_items_iter.for_each(|match_item| {match_item_set.push_and_set_id(match_item)});
         match_item_set
@@ -241,11 +248,6 @@ impl Repairer {
                     });
                 });
             }
-
-            // If all curves can be interpolated without problems, draw them
-            interpolated_curves.iter().for_each(|interpolated_curve| {
-                self.draw_util.draw_compound_path(&Color::get_palette_color(4), &interpolated_curve);
-            });
             
             // Trust it to be the correct solution
             return Some(interpolated_curves);

@@ -2,10 +2,12 @@ use wasm_bindgen::prelude::*;
 
 use std::convert::TryInto;
 
-use visioncortex::{Color, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
+use visioncortex::{Color, ColorName, CompoundPath, PathF64, PathI32, PointF64, PointI32, Spline};
 use web_sys::CanvasRenderingContext2d;
 
 use crate::canvas::Canvas;
+
+use super::FilledHoleMatrix;
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, PartialEq)]
@@ -130,6 +132,25 @@ impl DrawUtil {
                 visioncortex::CompoundPathElement::PathI32(path) => self.draw_path_i32(color, path),
                 visioncortex::CompoundPathElement::PathF64(path) => self.draw_path_f64(color, path),
                 visioncortex::CompoundPathElement::Spline(spline) => self.draw_spline(color, spline),
+            }
+        }
+    }
+
+    /// origin is top-left coordinate of the hole
+    pub fn draw_filled_hole(&self, filled_hole: FilledHoleMatrix, origin: PointI32) {
+        let blank = Color::color(&ColorName::Black);
+        let structure = Color::get_palette_color(4);
+        let texture = Color::color(&ColorName::Red);
+
+        for i in 0..filled_hole.height {
+            for j in 0..filled_hole.width {
+                let target = origin + PointI32::new(j as i32, i as i32);
+                let color = match filled_hole[i][j] {
+                    super::FilledHoleElement::Blank => blank,
+                    super::FilledHoleElement::Structure => structure,
+                    super::FilledHoleElement::Texture => texture,
+                };
+                self.draw_pixel_i32(&color, target);
             }
         }
     }
