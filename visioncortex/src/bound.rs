@@ -216,8 +216,6 @@ impl BoundingRect {
         assert!(self.have_point_on_boundary(p, 0));
         assert!(self.width() * self.height() > 1);
 
-        println!("{:?}", p);
-
         p + PointI32::new(
             if p.x == self.left {1}
             else if p.x == self.right {-1}

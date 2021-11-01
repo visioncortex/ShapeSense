@@ -290,6 +290,8 @@ where
 
 /// 2D Point with `u8` component
 pub type PointU8 = Point2<u8>;
+/// 2D Point with `usize` component
+pub type PointUsize = Point2<usize>;
 /// 2D Point with `i32` component
 pub type PointI32 = Point2<i32>;
 /// 2D Point with `f32` component

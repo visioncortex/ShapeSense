@@ -87,7 +87,7 @@ impl Repairer {
             .map(|segment| segment[0])
             .collect();
 
-        let filled_hole = HoleFiller::fill(&self.image, &self.hole_rect, interpolated_curves, endpoints);
+        let filled_hole = HoleFiller::fill(&self.image, self.hole_rect, interpolated_curves, endpoints);
         self.draw_util.draw_filled_hole(filled_hole, PointI32::new(self.hole_rect.left, self.hole_rect.top));
     }
 }
