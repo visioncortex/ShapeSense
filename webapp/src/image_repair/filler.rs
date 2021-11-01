@@ -198,7 +198,7 @@ impl HoleFiller {
                     break;
                 }
             }
-            if filled_pixels >= (total_pixels >> 1) {
+            if total_pixels > 3 && filled_pixels >= (total_pixels >> 1) {
                 let sampled_mid_point = sample_point(prev_endpoint, current_point);
                 let sampled_points = vec![
                     sample_point(prev_endpoint, sampled_mid_point),
