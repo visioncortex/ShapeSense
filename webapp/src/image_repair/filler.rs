@@ -122,12 +122,12 @@ impl HoleFiller {
             Coord2(p.x, p.y)
         }).collect();
 
-        let quantization_levels = std::cmp::max(matrix.width, matrix.height) << 1;
         let curve = Curve {
             start_point: points[0],
             end_point: points[3],
             control_points: (points[1], points[2]),
         };
+        let quantization_levels = (curve.estimate_length() as usize) << 2;
 
         for i in 0..quantization_levels {
             let t = i as f64 / quantization_levels as f64;
@@ -142,7 +142,9 @@ impl HoleFiller {
 
     /// The behavior is undefined unless 'offset' is the top-left corner of 'hole_rect' (exactly on its boundary).
     fn fill_holes(mut matrix: FilledHoleMatrix, image: &BinaryImage, hole_rect: BoundingRect, offset: PointI32, endpoints: Vec<PointI32>) -> FilledHoleMatrix {
-        let max_depth = matrix.width * matrix.height;
+        let max_depth = std::usize::MAX;
+
+        let endpoints = Self::adjust_endpoints(&hole_rect, endpoints);
         
         let bounding_points = hole_rect.get_boundary_points_from(endpoints[0], true);
         let num_points = bounding_points.len();
@@ -163,7 +165,7 @@ impl HoleFiller {
         
         // Check if first segment should be filled by majority voting
         // If so, fill it
-        let mut to_fill = {
+        let mut to_fill = { // To fill or not to fill the next segment
             let mut total_pixels = 0_usize;
             let mut filled_pixels = 0_usize;
             while !is_endpoint(bounding_points[current_point]) {
@@ -174,12 +176,11 @@ impl HoleFiller {
                 }
                 current_point = (current_point + 1) % num_points;
             }
-            console_log_util(format!("{} {}", filled_pixels, total_pixels));
             if filled_pixels >= (total_pixels >> 1) {
                 let sampled_point = sample_point(0, current_point);
                 let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
                 
-                Self::fill_hole_recursive(&mut matrix, (inside_point - offset).to_point_usize(), max_depth);
+                Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
                 false
             } else {
                 true
@@ -188,32 +189,100 @@ impl HoleFiller {
 
         // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
         // Repeat this until the first endpoint is seen again.
+        while current_point > 0 { // Not back to the first endpoint yet
+            let prev_endpoint = current_point;
+            loop {
+                current_point = (current_point + 1) % num_points;
+                if is_endpoint(bounding_points[current_point]) {
+                    break;
+                }
+            }
+            if to_fill {
+                let sampled_point = sample_point(prev_endpoint, current_point);
+                let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
+                
+                Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
+            }
+            to_fill = !to_fill;
+        }
 
         matrix
     }
 
-    fn fill_hole_recursive(matrix: &mut FilledHoleMatrix, point: PointUsize, depth: usize) {
+    // Correction for endpoints off boundary
+    fn adjust_endpoints(hole_rect: &BoundingRect, endpoints: Vec<PointI32>) -> Vec<PointI32> {
+        endpoints
+            .into_iter()
+            .map(|endpoint| {
+                if hole_rect.have_point_on_boundary(endpoint, 0) {
+                    endpoint
+                } else {
+                    // Determine if endpoint is vertically or horizontally aligned with the rect
+                    if hole_rect.left <= endpoint.x && endpoint.x <= hole_rect.right {
+                        // Should be adjusted to either top or bottom side
+                        PointI32::new(
+                            endpoint.x,
+                            if (hole_rect.top - endpoint.y).abs() < (hole_rect.bottom - endpoint.y).abs() {
+                                hole_rect.top
+                            } else {
+                                hole_rect.bottom
+                            }
+                        )
+                    } else if hole_rect.top <= endpoint.y && endpoint.y <= hole_rect.bottom {
+                        // Should be adjusted to either left and right side
+                        PointI32::new(
+                            if (hole_rect.left - endpoint.x).abs() < (hole_rect.right - endpoint.x).abs() {
+                                hole_rect.left
+                            } else {
+                                hole_rect.right
+                            },
+                            endpoint.y
+                        )
+                    } else {
+                        // Should be adjusted to one of the corners
+                        *[ hole_rect.top_left(), hole_rect.top_right(), hole_rect.bottom_left(), hole_rect.bottom_right() ]
+                            .iter()
+                            .min_by_key(|&corner| {
+                                endpoint.to_point_f64().distance_to(corner.to_point_f64()) as i32
+                            })
+                            .unwrap()
+                    }
+                }
+            })
+            .collect()
+    }
+
+    fn fill_hole_recursive(matrix: &mut FilledHoleMatrix, point: PointI32, depth: usize) {
         if depth == 0 {
             return;
         }
-        if point.x >= matrix.width || point.y >= matrix.height {
-            return;
-        }
-        if matrix[point] != FilledHoleElement::Blank {
+        if point.x < 0 || point.x >= matrix.width as i32 || point.y < 0 || point.y >= matrix.height as i32 {
             return;
         }
 
-        matrix[point] = FilledHoleElement::Texture;
+        let point_usize = point.to_point_usize();
 
-        Self::fill_hole_recursive(matrix, point + PointUsize::new(1, 0), depth-1);
-        Self::fill_hole_recursive(matrix, point + PointUsize::new(0, 1), depth-1);
-
-        if point.x > 0 {
-            Self::fill_hole_recursive(matrix, point - PointUsize::new(1, 0), depth-1);
+        if matrix[point_usize] != FilledHoleElement::Blank {
+            return;
         }
 
-        if point.y > 0 {
-            Self::fill_hole_recursive(matrix, point - PointUsize::new(0, 1), depth-1);
-        }
+        let four_neighbors = vec![
+            point + PointI32::new(1, 0),
+            point + PointI32::new(0, 1),
+            point + PointI32::new(-1, 0),
+            point + PointI32::new(0, -1)
+        ];
+
+        let diagonal_neighbors = vec![
+            point + PointI32::new(-1, -1),
+            point + PointI32::new(1, -1),
+            point + PointI32::new(1, 1),
+            point + PointI32::new(-1, 1),
+        ];
+
+        matrix[point_usize] = FilledHoleElement::Texture;
+
+        // Flooding to 4-neighbors
+        four_neighbors.into_iter().for_each(|neighbor| Self::fill_hole_recursive(matrix, neighbor, depth-1));
     }
 }

@@ -90,6 +90,22 @@ impl BoundingRect {
         }
     }
 
+    pub fn top_left(&self) -> PointI32 {
+        PointI32::new(self.left, self.top)
+    }
+
+    pub fn top_right(&self) -> PointI32 {
+        PointI32::new(self.right, self.top)
+    }
+
+    pub fn bottom_left(&self) -> PointI32 {
+        PointI32::new(self.left, self.bottom)
+    }
+
+    pub fn bottom_right(&self) -> PointI32 {
+        PointI32::new(self.right, self.bottom)
+    }
+
     /// Calculates the squared distance betweeen the center of two `BoundingRect`s.
     pub fn sq_dist(self, other: Self) -> i32 {
         let diff = self.center() - other.center();

@@ -82,15 +82,13 @@ impl Repairer {
             ).unwrap_or_else(|| panic!("Still not interpolated."))
         });
 
+        // interpolated_curves.into_iter().for_each(|curve| {
+        //     self.draw_util.draw_compound_path(&Color::color(&ColorName::Red), &curve)
+        // });
+
         let endpoints: Vec<PointI32> = path_segments
             .into_iter()
-            .filter_map(|segment|
-                if self.hole_rect.have_point_on_boundary(segment[0], 0) {
-                    Some(segment[0])
-                } else {
-                    None
-                }
-            )
+            .map(|segment| segment[0] )
             .collect();
 
         let filled_hole = HoleFiller::fill(&self.image, self.hole_rect, interpolated_curves, endpoints);
