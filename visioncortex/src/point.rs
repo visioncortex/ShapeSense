@@ -300,6 +300,10 @@ pub type PointF32 = Point2<f32>;
 pub type PointF64 = Point2<f64>;
 
 impl PointI32 {
+    pub fn to_point_usize(&self) -> PointUsize {
+        PointUsize {x: self.x as usize, y: self.y as usize}
+    }
+
     pub fn to_point_f64(&self) -> PointF64 {
         PointF64 { x: self.x as f64, y: self.y as f64 }
     }

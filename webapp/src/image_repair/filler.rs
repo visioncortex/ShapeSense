@@ -1,4 +1,4 @@
-use std::{convert::TryInto, ops::{Index, IndexMut}};
+use std::{collections::HashSet, convert::TryInto, ops::{Index, IndexMut}};
 
 use flo_curves::{BezierCurve, Coord2, Coordinate2D, bezier::Curve};
 use visioncortex::{BinaryImage, BoundingRect, CompoundPath, PointF64, PointI32, PointUsize};
@@ -76,6 +76,7 @@ impl HoleFiller {
         let matrix = Self::rasterize_interpolated_curves(matrix, interpolated_curves, origin);
 
         Self::fill_holes(matrix, image, hole_rect, origin, endpoints)
+        // matrix
    }
 }
 
@@ -141,19 +142,52 @@ impl HoleFiller {
 
     /// The behavior is undefined unless 'offset' is the top-left corner of 'hole_rect' (exactly on its boundary).
     fn fill_holes(mut matrix: FilledHoleMatrix, image: &BinaryImage, hole_rect: BoundingRect, offset: PointI32, endpoints: Vec<PointI32>) -> FilledHoleMatrix {
-        hole_rect.get_boundary_points_from(offset, true)
-            .into_iter()
-            .for_each(|boundary_point| {
-                let inside_point = hole_rect.get_closest_point_inside(boundary_point);
-                let outside_point = hole_rect.get_closest_point_outside(boundary_point);
-                if !image.get_pixel_at_safe(inside_point)
-                   && image.get_pixel_at_safe(outside_point) {
-                       console_log_util(format!("{:?} {:?}", inside_point, outside_point));
-                    let point = inside_point - offset;
-                    let point = PointUsize::new(point.x as usize, point.y as usize);
-                    Self::fill_hole_recursive(&mut matrix, point, 100000000);
+        let max_depth = matrix.width * matrix.height;
+        
+        let bounding_points = hole_rect.get_boundary_points_from(endpoints[0], true);
+        let num_points = bounding_points.len();
+        let mut current_point = 1; // Skipping the first endpoint
+        // The middle point between from and to in a cyclic manner.
+        // Used to sample the middle point between endpoints.
+        let sample_point = |from: usize, to: usize| {
+            let cyclic_dist = if to >= from {
+                to - from
+            } else {
+                num_points - (from - to)
+            };
+            (from + (cyclic_dist >> 1)) % num_points
+        };
+
+        let endpoints_set = endpoints.iter().copied().collect::<HashSet<PointI32> >();
+        let is_endpoint = |p| { endpoints_set.contains(&p) };
+        
+        // Check if first segment should be filled by majority voting
+        // If so, fill it
+        let mut to_fill = {
+            let mut total_pixels = 0_usize;
+            let mut filled_pixels = 0_usize;
+            while !is_endpoint(bounding_points[current_point]) {
+                total_pixels += 1;
+                let outside_point = hole_rect.get_closest_point_outside(bounding_points[current_point]);
+                if image.get_pixel_at_safe(outside_point) {
+                    filled_pixels += 1;
                 }
-            });
+                current_point = (current_point + 1) % num_points;
+            }
+            console_log_util(format!("{} {}", filled_pixels, total_pixels));
+            if filled_pixels >= (total_pixels >> 1) {
+                let sampled_point = sample_point(0, current_point);
+                let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
+                
+                Self::fill_hole_recursive(&mut matrix, (inside_point - offset).to_point_usize(), max_depth);
+                false
+            } else {
+                true
+            }
+        };
+
+        // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
+        // Repeat this until the first endpoint is seen again.
 
         matrix
     }

@@ -84,7 +84,13 @@ impl Repairer {
 
         let endpoints: Vec<PointI32> = path_segments
             .into_iter()
-            .map(|segment| segment[0])
+            .filter_map(|segment|
+                if self.hole_rect.have_point_on_boundary(segment[0], 0) {
+                    Some(segment[0])
+                } else {
+                    None
+                }
+            )
             .collect();
 
         let filled_hole = HoleFiller::fill(&self.image, self.hole_rect, interpolated_curves, endpoints);
