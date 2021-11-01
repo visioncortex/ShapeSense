@@ -199,11 +199,17 @@ impl HoleFiller {
                 }
             }
             if filled_pixels >= (total_pixels >> 1) {
-                let sampled_point = sample_point(prev_endpoint, current_point);
-                let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
-                let inside_point = eval_inside_point(sampled_point);
-                
-                Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
+                let sampled_mid_point = sample_point(prev_endpoint, current_point);
+                let sampled_points = vec![
+                    sample_point(prev_endpoint, sampled_mid_point),
+                    sampled_mid_point,
+                    sample_point(sampled_mid_point, current_point),
+                ];
+
+                sampled_points.into_iter().for_each(|sampled_point| {
+                    let inside_point = eval_inside_point(sampled_point);
+                    Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
+                });
             }
 
             if current_point == 0 {
