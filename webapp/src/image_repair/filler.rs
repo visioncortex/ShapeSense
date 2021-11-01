@@ -148,7 +148,7 @@ impl HoleFiller {
         
         let bounding_points = hole_rect.get_boundary_points_from(endpoints[0], true);
         let num_points = bounding_points.len();
-        let mut current_point = 1; // Skipping the first endpoint
+        let mut current_point = 0;
         // The middle point between from and to in a cyclic manner.
         // Used to sample the middle point between endpoints.
         let sample_point = |from: usize, to: usize| {
@@ -162,48 +162,34 @@ impl HoleFiller {
 
         let endpoints_set = endpoints.iter().copied().collect::<HashSet<PointI32> >();
         let is_endpoint = |p| { endpoints_set.contains(&p) };
-        
-        // Check if first segment should be filled by majority voting
-        // If so, fill it
-        let mut to_fill = { // To fill or not to fill the next segment
+
+        // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
+        // Repeat this until the first endpoint is seen again.
+        loop { // Not back to the first endpoint yet
+            let prev_endpoint = current_point;
             let mut total_pixels = 0_usize;
             let mut filled_pixels = 0_usize;
-            while !is_endpoint(bounding_points[current_point]) {
+            loop {
+                current_point = (current_point + 1) % num_points;
                 total_pixels += 1;
                 let outside_point = hole_rect.get_closest_point_outside(bounding_points[current_point]);
                 if image.get_pixel_at_safe(outside_point) {
                     filled_pixels += 1;
                 }
-                current_point = (current_point + 1) % num_points;
-            }
-            if filled_pixels >= (total_pixels >> 1) {
-                let sampled_point = sample_point(0, current_point);
-                let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
-                
-                Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
-                false
-            } else {
-                true
-            }
-        };
-
-        // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
-        // Repeat this until the first endpoint is seen again.
-        while current_point > 0 { // Not back to the first endpoint yet
-            let prev_endpoint = current_point;
-            loop {
-                current_point = (current_point + 1) % num_points;
                 if is_endpoint(bounding_points[current_point]) {
                     break;
                 }
             }
-            if to_fill {
+            if filled_pixels >= (total_pixels >> 1) {
                 let sampled_point = sample_point(prev_endpoint, current_point);
                 let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
                 
                 Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
             }
-            to_fill = !to_fill;
+
+            if current_point == 0 {
+                break;
+            }
         }
 
         matrix
