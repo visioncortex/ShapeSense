@@ -163,6 +163,24 @@ impl HoleFiller {
         let endpoints_set = endpoints.iter().copied().collect::<HashSet<PointI32> >();
         let is_endpoint = |p| { endpoints_set.contains(&p) };
 
+        let eval_outside_point = |point_idx| {
+            let point_val: PointI32 = bounding_points[point_idx];
+            if point_val.x == hole_rect.right || point_val.y == hole_rect.bottom {
+                point_val
+            } else {
+                hole_rect.get_closest_point_outside(point_val)
+            }
+        };
+
+        let eval_inside_point = |point_idx| {
+            let point_val: PointI32 = bounding_points[point_idx];
+            if point_val.x == hole_rect.left || point_val.y == hole_rect.top {
+                point_val
+            } else {
+                hole_rect.get_closest_point_inside(point_val)
+            }
+        };
+
         // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
         // Repeat this until the first endpoint is seen again.
         loop { // Not back to the first endpoint yet
@@ -172,7 +190,7 @@ impl HoleFiller {
             loop {
                 current_point = (current_point + 1) % num_points;
                 total_pixels += 1;
-                let outside_point = hole_rect.get_closest_point_outside(bounding_points[current_point]);
+                let outside_point = eval_outside_point(current_point);
                 if image.get_pixel_at_safe(outside_point) {
                     filled_pixels += 1;
                 }
@@ -183,6 +201,7 @@ impl HoleFiller {
             if filled_pixels >= (total_pixels >> 1) {
                 let sampled_point = sample_point(prev_endpoint, current_point);
                 let inside_point = hole_rect.get_closest_point_inside(bounding_points[sampled_point]);
+                let inside_point = eval_inside_point(sampled_point);
                 
                 Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
             }

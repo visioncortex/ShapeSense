@@ -8,7 +8,7 @@ let imageSrc: string;
 
 let processCounter = 0;
 
-const initialHoleRect = { x: 60, y: 34, w: 40, h: 31 };
+const initialHoleRect = { x: 22, y: 27, w: 40, h: 31 };
 const clearFirstOutput = false;
 
 const clipValue = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
