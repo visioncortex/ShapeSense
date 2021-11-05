@@ -73,8 +73,8 @@ impl Repairer {
         }
 
         //# Matching paths
-        let match_item_set = self.construct_match_item_set(&path_segments);
-        let matchings = Matcher::find_all_possible_matchings(match_item_set);
+        let match_item_set = self.construct_match_item_set(&path_segments)?;
+        let matchings = Matcher::find_all_possible_matchings(match_item_set)?;
 
         let mut correct_tail_tangents = false; // First try interpolation without correcting tail tangents
         let interpolated_curves = self.try_interpolate_with_matchings(
@@ -159,7 +159,10 @@ impl Repairer {
         endpoints_iter.filter_map(|endpoint| {
             let inserted = current_endpoints.insert(path[endpoint]);
             if inserted {
-                Some(self.walk_segment(&path, endpoint, &is_boundary_mask, simplify_tolerance))
+                match self.walk_segment(&path, endpoint, &is_boundary_mask, simplify_tolerance) {
+                    Ok(segment) => Some(segment),
+                    Err(error) => panic!("{}", error),
+                }
             } else {
                 None
             }
@@ -167,14 +170,18 @@ impl Repairer {
     }
 
     /// The behavior is undefined unless path.len() == is_boundary_mask.len().
-    fn walk_segment(&self, path: &PathI32, endpoint_index: usize, is_boundary_mask: &BitVec<u32>, simplify_tolerance: f64) -> PathI32 {
-        assert_eq!(path.len(), is_boundary_mask.len());
+    fn walk_segment(&self, path: &PathI32, endpoint_index: usize, is_boundary_mask: &BitVec<u32>, simplify_tolerance: f64) -> Result<PathI32, String> {
+        if path.len() != is_boundary_mask.len() {
+            return Err("Length of path must be equal to length of boundary mask.".into());
+        }
 
         // Determine direction
         let len = path.len();
         let prev = if endpoint_index == 0 {len-1} else {endpoint_index-1};
         let next = (endpoint_index + 1) % len;
-        assert!(is_boundary_mask[prev] != is_boundary_mask[next]); // Only one side is boundary, not degenerate corner case
+        if is_boundary_mask[prev] == is_boundary_mask[next] { // Only one side can be boundary, not degenerate corner case
+            return Err("Only one neighbor can be boundary point.".into());
+        }
         let direction = if is_boundary_mask[prev] {1} else {-1};
 
         // Walk from 'endpoint_index' along 'path' by 'direction'
@@ -195,14 +202,17 @@ impl Repairer {
         }
 
         // Simplify 'path_segment'
-        PathI32::from_points(visioncortex::reduce::reduce(&path_segment.path, simplify_tolerance))
+        Ok(PathI32::from_points(visioncortex::reduce::reduce(&path_segment.path, simplify_tolerance)))
     }
 
     /// The behavior is undefined unless 'path_segments' has an even number of elements.
     /// The behavior is also undefined unless every segment has at least 2 points.
     /// The behavior is also undefined unless all segments have their tails at index 0.
-    fn construct_match_item_set(&self, path_segments: &[PathI32]) -> MatchItemSet {
-        assert_eq!(path_segments.len() % 2, 0);
+    fn construct_match_item_set(&self, path_segments: &[PathI32]) -> Result<MatchItemSet, String> {
+        if path_segments.len() % 2 != 0 {
+            return Err("There must be an even number of path segments.".into());
+        }
+
         let match_items_iter = path_segments
             .iter()
             .map(|segment| {
@@ -213,7 +223,7 @@ impl Repairer {
             });
         let mut match_item_set = MatchItemSet::new();
         match_items_iter.for_each(|match_item| {match_item_set.push_and_set_id(match_item)});
-        match_item_set
+        Ok(match_item_set)
     }
 
     /// Return true iff one of the matchings is successfully interpolated

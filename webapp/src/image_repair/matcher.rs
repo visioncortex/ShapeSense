@@ -33,10 +33,14 @@ impl Matcher {
 
     /// Find all possible matchings for each possible partition.
     /// The behavior is undefined unless 'match_items' contains n items where n is even and n>0.
-    pub fn find_all_possible_matchings(match_items: MatchItemSet) -> Vec<Matching> {
+    pub fn find_all_possible_matchings(match_items: MatchItemSet) -> Result<Vec<Matching>, String> {
         let len = match_items.len();
-        assert_eq!(len % 2, 0);
-        assert!(len > 0);
+        if len % 2 != 0 {
+            return Err("There must be an even number of match items.".into());
+        }
+        if len == 0 {
+            return Err("There must be some match items.".into());
+        }
 
         let indices: Vec<usize> = (0..len).into_iter().collect();
 
@@ -89,7 +93,7 @@ impl Matcher {
         matchings_with_variances.sort_by(|(_, variance1), (_, variance2)| variance1.partial_cmp(variance2).unwrap());
 
         // Keep only matchings
-        matchings_with_variances.into_iter().map(|(matching, _)| matching).collect()
+        Ok(matchings_with_variances.into_iter().map(|(matching, _)| matching).collect())
     }
 }
 
