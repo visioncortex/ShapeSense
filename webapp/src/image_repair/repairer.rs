@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
-use super::{HoleFiller, Matching, RepairerConfig, draw::{DisplaySelector, DrawUtil}};
+use super::{FilledHoleMatrix, HoleFiller, Matching, RepairerConfig, draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
 pub struct Repairer {
@@ -31,8 +31,6 @@ impl Repairer {
 
         let hole_rect = BoundingRect::new_x_y_w_h(x as i32, y as i32, w as i32, h as i32);
 
-        let empty_color = Color::color(&ColorName::White);
-
         // Remove hole from image
         for x_offset in 0..hole_rect.width() {
             for y_offset in 0..hole_rect.height() {
@@ -40,18 +38,30 @@ impl Repairer {
             }
         }
 
-        // Draw hole on canvas
-        draw_util.fill_rect(&empty_color, x, y, w, h);
-
         let repairer = Self { image, hole_rect, draw_util };
 
-        repairer.repair(config.simplify_tolerance, config.curve_interpolator_config);
+        let result = repairer.repair_and_draw(config.simplify_tolerance, config.curve_interpolator_config);
+        
+        match result {
+            Ok(_) => {},
+            Err(error) => {
+                panic!("{}", error)
+            },
+        }
     }
 }
 
 // API
 impl Repairer {
-    pub fn repair(&self, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) {
+    pub fn repair_and_draw(&self, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+        let filled_hole = self.repair(simplify_tolerance, curve_interpolator_config)?;
+
+        self.draw_util.draw_filled_hole(filled_hole, PointI32::new(self.hole_rect.left, self.hole_rect.top));
+
+        Ok(())
+    }
+
+    pub fn repair(&self, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<FilledHoleMatrix, String> {
         //# Path walking
         let paths = self.get_test_paths();
 
@@ -59,7 +69,7 @@ impl Repairer {
         let path_segments = self.find_simplified_segments_from_paths(paths, simplify_tolerance);
 
         if path_segments.is_empty() {
-            return;
+            return Err("No path segments".into());
         }
 
         //# Matching paths
@@ -91,8 +101,7 @@ impl Repairer {
             .map(|segment| segment[0] )
             .collect();
 
-        let filled_hole = HoleFiller::fill(&self.image, self.hole_rect, interpolated_curves, endpoints);
-        self.draw_util.draw_filled_hole(filled_hole, PointI32::new(self.hole_rect.left, self.hole_rect.top));
+        Ok( HoleFiller::fill(&self.image, self.hole_rect, interpolated_curves, endpoints) )
     }
 }
 
