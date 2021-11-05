@@ -5,7 +5,7 @@ use visioncortex::{BinaryImage, BoundingRect, CompoundPath, PointF64, PointI32, 
 
 use crate::util::{console_log_debug_util, console_log_util};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum FilledHoleElement {
     Blank,
     Structure,
@@ -25,6 +25,26 @@ impl FilledHoleMatrix {
             height,
             elems: vec![FilledHoleElement::Blank; width * height],
         }
+    }
+
+    pub fn new_without_column(&self, col: usize) -> Self {
+        let mut matrix = Self::new(self.width-1, self.height);
+        for i in 0..matrix.height {
+            for j in 0..matrix.width {
+                matrix[i][j] = self[i][if j < col { j } else { j+1 }];
+            }
+        }
+        matrix
+    }
+
+    pub fn new_without_row(&self, row: usize) -> Self {
+        let mut matrix = Self::new(self.width, self.height-1);
+        for i in 0..matrix.height {
+            for j in 0..matrix.width {
+                matrix[i][j] = self[if i < row { i } else { i+1 }][j];
+            }
+        }
+        matrix
     }
 }
 

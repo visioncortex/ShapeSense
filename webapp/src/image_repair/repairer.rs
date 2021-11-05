@@ -11,7 +11,6 @@ use super::{FilledHoleMatrix, HoleFiller, Matching, RepairerConfig, draw::{Displ
 #[wasm_bindgen]
 pub struct Repairer {
     image: BinaryImage,
-    hole_rect: BoundingRect,
     draw_util: DrawUtil,
 }
 
@@ -38,9 +37,9 @@ impl Repairer {
             }
         }
 
-        let repairer = Self { image, hole_rect, draw_util };
+        let repairer = Self { image, draw_util };
 
-        let result = repairer.repair_and_draw(config.simplify_tolerance, config.curve_interpolator_config);
+        let result = repairer.repair_and_draw_expandable(hole_rect, config.simplify_tolerance, config.curve_interpolator_config);
         
         match result {
             Ok(_) => {},
@@ -53,44 +52,101 @@ impl Repairer {
 
 // API
 impl Repairer {
-    pub fn repair_and_draw(&self, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
-        let filled_hole = self.repair(simplify_tolerance, curve_interpolator_config)?;
+    pub fn repair_and_draw(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+        let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
+        let filled_hole = self.repair(hole_rect, simplify_tolerance, curve_interpolator_config)?;
 
-        self.draw_util.draw_filled_hole(filled_hole, PointI32::new(self.hole_rect.left, self.hole_rect.top));
+        self.draw_util.draw_filled_hole(filled_hole, hole_origin);
 
         Ok(())
     }
 
-    pub fn repair(&self, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<FilledHoleMatrix, String> {
+    /// If repairing fails, expand along each side and take the first successful result.
+    pub fn repair_and_draw_expandable(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+        let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
+        let filled_hole = match self.repair(hole_rect, simplify_tolerance, curve_interpolator_config) {
+            Ok(filled_hole) => filled_hole,
+            Err(mut error) => {
+                error += "\n";
+                let try_expand = || {
+                    let (x, y, w, h) = (hole_rect.left, hole_rect.top, hole_rect.width(), hole_rect.height());
+                    let expanded_hole_rects = vec![
+                        BoundingRect::new_x_y_w_h(x-1, y, w+1, h), // Expanded to the left
+                        BoundingRect::new_x_y_w_h(x, y-1, w, h+1), // Expanded upward
+                        BoundingRect::new_x_y_w_h(x, y, w+1, h), // Expanded to the right
+                        BoundingRect::new_x_y_w_h(x, y, w, h+1), // Expanded downward
+                    ];
+                    for (i, expanded_hole_rect) in expanded_hole_rects.into_iter().enumerate() {
+                        if 0 <= hole_rect.left && hole_rect.right <= self.image.width as i32
+                            && 0 <= hole_rect.top && hole_rect.bottom <= self.image.height as i32 {
+                            
+                            match self.repair(expanded_hole_rect, simplify_tolerance, curve_interpolator_config) {
+                                Ok(filled_hole) => {
+                                    return Ok(
+                                        // Remove the expanded column/row
+                                        match i {
+                                            0 => filled_hole.new_without_column(0),
+                                            1 => filled_hole.new_without_row(0),
+                                            2 => filled_hole.new_without_column(w as usize - 1),
+                                            3 => filled_hole.new_without_row(h as usize - 1),
+                                            _ => panic!("Impossible."),
+                                        }
+                                    );
+                                },
+                                Err(expanded_error) => {
+                                    error += &(expanded_error + "\n");
+                                },
+                            }
+                        } else {
+                            error += "Expansion out of range.\n";
+                        }
+                    }
+                    Err(error)
+                };
+                try_expand()?
+            },
+        };
+
+        self.draw_util.draw_filled_hole(filled_hole, hole_origin);
+
+        Ok(())
+    }
+
+    pub fn repair(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<FilledHoleMatrix, String> {
         //# Path walking
         let paths = self.get_test_paths();
 
         //# Path identification, segmentation, and simplification
-        let path_segments = self.find_simplified_segments_from_paths(paths, simplify_tolerance);
+        let path_segments = self.find_simplified_segments_from_paths(&hole_rect, paths, simplify_tolerance);
 
         if path_segments.is_empty() {
-            return Err("No path segments".into());
+            return Ok(FilledHoleMatrix::new(hole_rect.width() as usize, hole_rect.height() as usize));
         }
 
         //# Matching paths
         let match_item_set = self.construct_match_item_set(&path_segments)?;
         let matchings = Matcher::find_all_possible_matchings(match_item_set)?;
 
-        let mut correct_tail_tangents = false; // First try interpolation without correcting tail tangents
-        let interpolated_curves = self.try_interpolate_with_matchings(
-            &matchings,
-            &path_segments,
-            curve_interpolator_config,
-            correct_tail_tangents
-        ).unwrap_or_else(|| {
-            correct_tail_tangents = true;
-            self.try_interpolate_with_matchings(
-                &matchings,
-                &path_segments,
-                curve_interpolator_config,
-                correct_tail_tangents
-            ).unwrap_or_else(|| panic!("Still not interpolated."))
-        });
+        let interpolated_curves = {
+            let try_interpolation = |correct_tail_tangents| {
+                self.try_interpolate_with_matchings(
+                    hole_rect,
+                    &matchings,
+                    &path_segments,
+                    curve_interpolator_config,
+                    correct_tail_tangents
+                )
+            };
+            let mut option = try_interpolation(false); // First try interpolation without correcting tail tangents
+            if option.is_none() {
+                option = try_interpolation(true);
+                if option.is_none() {
+                    return Err("Still not interpolated.".into());
+                };
+            };
+
+            option.unwrap()
+        };
 
         // interpolated_curves.into_iter().for_each(|curve| {
         //     self.draw_util.draw_compound_path(&Color::color(&ColorName::Red), &curve)
@@ -101,13 +157,12 @@ impl Repairer {
             .map(|segment| segment[0] )
             .collect();
 
-        Ok( HoleFiller::fill(&self.image, self.hole_rect, interpolated_curves, endpoints) )
+        Ok( HoleFiller::fill(&self.image, hole_rect, interpolated_curves, endpoints) )
     }
 }
 
 // Helper functions
 impl Repairer {
-    // Assume object shape is red
     fn get_test_paths(&self) -> Vec<PathI32> {        
         let clusters = self.image.to_clusters(false);
 
@@ -126,12 +181,12 @@ impl Repairer {
     }
 
     // The larger the tolerance, the fewer points will be left in output path.
-    fn find_simplified_segments_from_paths(&self, paths: Vec<PathI32>, simplify_tolerance: f64) -> Vec<PathI32> {
+    fn find_simplified_segments_from_paths(&self, hole_rect: &BoundingRect, paths: Vec<PathI32>, simplify_tolerance: f64) -> Vec<PathI32> {
         let mut endpoints = HashSet::new();
         paths
             .into_iter()
             .map(|path| {
-                self.find_segments_on_path_with_unique_endpoints(path, &mut endpoints, simplify_tolerance)
+                self.find_segments_on_path_with_unique_endpoints(hole_rect, path, &mut endpoints, simplify_tolerance)
             })
             .flatten()
             .collect()
@@ -139,11 +194,11 @@ impl Repairer {
 
     /// Return a vector of *simplified* path segments whose heads are endpoints, pointing outwards from hole_rect.
     /// Segments are walked until 'max_num_points' is reached or another boundary point is reached, whichever happens first.
-    fn find_segments_on_path_with_unique_endpoints(&self, path: PathI32, current_endpoints: &mut HashSet<PointI32>, simplify_tolerance: f64) -> Vec<PathI32> {
+    fn find_segments_on_path_with_unique_endpoints(&self, hole_rect: &BoundingRect, path: PathI32, current_endpoints: &mut HashSet<PointI32>, simplify_tolerance: f64) -> Vec<PathI32> {
         let path = path.to_open();
         let len = path.len();
         let is_boundary_mask = BitVec::from_fn(len, |i| {
-            self.hole_rect.have_point_on_boundary(path[i], 1)
+            hole_rect.have_point_on_boundary(path[i], 1)
         });
 
         let endpoints_iter = (0..len).into_iter().filter(|&i| {
@@ -229,12 +284,13 @@ impl Repairer {
     /// Return true iff one of the matchings is successfully interpolated
     fn try_interpolate_with_matchings(
         &self,
+        hole_rect: BoundingRect,
         matchings: &[Matching],
         path_segments: &[PathI32],
         curve_interpolator_config: CurveInterpolatorConfig,
         correct_tail_tangents: bool // Not a configuration, but a fail-safe feature
     ) -> Option<Vec<CompoundPath> > {
-        let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, self.hole_rect, self.draw_util.clone());
+        let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, hole_rect, self.draw_util.clone());
 
         'matching_loop: for matching in matchings.iter() {
             let mut interpolated_curves = vec![];
