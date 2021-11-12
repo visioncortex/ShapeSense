@@ -1,5 +1,5 @@
 use wasm_bindgen::prelude::*;
-use super::{CurveInterpolatorConfig, draw::DisplaySelector};
+use super::{CurveIntrapolatorConfig, draw::DisplaySelector};
 
 /// Configuration to ShapeCompletor
 #[wasm_bindgen]
@@ -18,7 +18,7 @@ pub struct CompletorConfig {
     pub simplify_tolerance: f64,
 
     // Curve interpolator
-    pub curve_interpolator_config: CurveInterpolatorConfig,
+    pub curve_interpolator_config: CurveIntrapolatorConfig,
     
 }
 

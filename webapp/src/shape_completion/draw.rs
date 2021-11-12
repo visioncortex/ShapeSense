@@ -150,7 +150,8 @@ impl DrawUtil {
                     super::FilledHoleElement::Structure => structure,
                     super::FilledHoleElement::Texture => texture,
                 };
-                self.draw_pixel_i32(&color, target);
+                // self.draw_pixel_i32(&color, target);
+                self.draw_pixel_i32(&Color::color(&ColorName::White), target);
             }
         }
     }

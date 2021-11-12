@@ -87,13 +87,13 @@ impl HoleFiller {
     pub fn fill(
        image: &BinaryImage,
        hole_rect: BoundingRect,
-       interpolated_curves: Vec<CompoundPath>,
+       intrapolated_curves: Vec<CompoundPath>,
        endpoints: Vec<PointI32>
     ) -> FilledHoleMatrix {
         let matrix = FilledHoleMatrix::new(hole_rect.width() as usize, hole_rect.height() as usize);
         let origin = PointI32::new(hole_rect.left, hole_rect.top);
 
-        let matrix = Self::rasterize_interpolated_curves(matrix, interpolated_curves, origin);
+        let matrix = Self::rasterize_intrapolated_curves(matrix, intrapolated_curves, origin);
 
         Self::fill_holes(matrix, image, hole_rect, origin, endpoints)
         // matrix
@@ -102,7 +102,7 @@ impl HoleFiller {
 
 // Helper functions
 impl HoleFiller {
-    fn rasterize_interpolated_curves(mut matrix: FilledHoleMatrix, curves: Vec<CompoundPath>, origin: PointI32) -> FilledHoleMatrix {
+    fn rasterize_intrapolated_curves(mut matrix: FilledHoleMatrix, curves: Vec<CompoundPath>, origin: PointI32) -> FilledHoleMatrix {
         let offset = -origin;
         curves.into_iter().for_each(|mut compound_path| {
             compound_path.iter_mut().for_each(|path_elem| {

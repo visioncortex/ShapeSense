@@ -4,7 +4,7 @@ use bit_vec::BitVec;
 use visioncortex::{BinaryImage, BoundingRect, Color, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 use wasm_bindgen::prelude::*;
 
-use crate::{shape_completion::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
+use crate::{shape_completion::{CurveIntrapolator, CurveIntrapolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
 use super::{FilledHoleMatrix, HoleFiller, Matching, CompletorConfig, draw::{DisplaySelector, DrawUtil}};
 
@@ -33,7 +33,7 @@ impl ShapeCompletor {
         // Remove hole from image
         for x_offset in 0..hole_rect.width() {
             for y_offset in 0..hole_rect.height() {
-                image.set_pixel(x + x_offset as usize, y + y_offset as usize, false)
+                image.set_pixel(x + x_offset as usize, y + y_offset as usize, false);
             }
         }
 
@@ -52,7 +52,7 @@ impl ShapeCompletor {
 
 // API
 impl ShapeCompletor {
-    pub fn complete_shape_and_draw(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+    pub fn complete_shape_and_draw(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveIntrapolatorConfig) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
         let filled_hole = self.complete_shape(hole_rect, simplify_tolerance, curve_interpolator_config)?;
 
@@ -62,7 +62,7 @@ impl ShapeCompletor {
     }
 
     /// If shape completion fails, expand along each side and take the first successful result.
-    pub fn complete_shape_and_draw_expandable(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+    pub fn complete_shape_and_draw_expandable(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveIntrapolatorConfig) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
         let filled_hole = match self.complete_shape(hole_rect, simplify_tolerance, curve_interpolator_config) {
             Ok(filled_hole) => filled_hole,
@@ -112,7 +112,7 @@ impl ShapeCompletor {
         Ok(())
     }
 
-    pub fn complete_shape(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<FilledHoleMatrix, String> {
+    pub fn complete_shape(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveIntrapolatorConfig) -> Result<FilledHoleMatrix, String> {
         //# Path walking
         let paths = self.get_test_paths();
 
@@ -127,9 +127,9 @@ impl ShapeCompletor {
         let match_item_set = self.construct_match_item_set(&path_segments)?;
         let matchings = Matcher::find_all_possible_matchings(match_item_set)?;
 
-        let interpolated_curves = {
-            let try_interpolation = |correct_tail_tangents| {
-                self.try_interpolate_with_matchings(
+        let intrapolated_curves = {
+            let try_intrapolation = |correct_tail_tangents| {
+                self.try_intrapolate_with_matchings(
                     hole_rect,
                     &matchings,
                     &path_segments,
@@ -137,18 +137,18 @@ impl ShapeCompletor {
                     correct_tail_tangents
                 )
             };
-            let mut option = try_interpolation(false); // First try interpolation without correcting tail tangents
+            let mut option = try_intrapolation(false); // First try interpolation without correcting tail tangents
             if option.is_none() {
-                option = try_interpolation(true);
+                option = try_intrapolation(true);
                 if option.is_none() {
-                    return Err("Still not interpolated.".into());
+                    return Err("Still not intrapolated.".into());
                 };
             };
 
             option.unwrap()
         };
 
-        // interpolated_curves.into_iter().for_each(|curve| {
+        // intrapolated_curves.into_iter().for_each(|curve| {
         //     self.draw_util.draw_compound_path(&Color::color(&ColorName::Red), &curve)
         // });
 
@@ -157,7 +157,7 @@ impl ShapeCompletor {
             .map(|segment| segment[0] )
             .collect();
 
-        Ok( HoleFiller::fill(&self.image, hole_rect, interpolated_curves, endpoints) )
+        Ok( HoleFiller::fill(&self.image, hole_rect, intrapolated_curves, endpoints) )
     }
 }
 
@@ -281,19 +281,19 @@ impl ShapeCompletor {
         Ok(match_item_set)
     }
 
-    /// Return true iff one of the matchings is successfully interpolated
-    fn try_interpolate_with_matchings(
+    /// Return true iff one of the matchings is successfully intrapolated
+    fn try_intrapolate_with_matchings(
         &self,
         hole_rect: BoundingRect,
         matchings: &[Matching],
         path_segments: &[PathI32],
-        curve_interpolator_config: CurveInterpolatorConfig,
+        curve_interpolator_config: CurveIntrapolatorConfig,
         correct_tail_tangents: bool // Not a configuration, but a fail-safe feature
     ) -> Option<Vec<CompoundPath> > {
-        let curve_interpolator = CurveInterpolator::new(curve_interpolator_config, hole_rect, self.draw_util.clone());
+        let curve_interpolator = CurveIntrapolator::new(curve_interpolator_config, hole_rect, self.draw_util.clone());
 
         'matching_loop: for matching in matchings.iter() {
-            let mut interpolated_curves = vec![];
+            let mut intrapolated_curves = vec![];
             for &(index1, index2) in matching.iter() {
                 let (curve1, curve2) = (path_segments[index1].to_path_f64(), path_segments[index2].to_path_f64());
 
@@ -304,21 +304,21 @@ impl ShapeCompletor {
                     self.draw_util.draw_path_f64(&color2, &curve2);
                 }
                 
-                if let Some(interpolated_curve) = curve_interpolator.interpolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents) {
-                    interpolated_curves.push(interpolated_curve);
+                if let Some(intrapolated_curve) = curve_interpolator.intrapolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents) {
+                    intrapolated_curves.push(intrapolated_curve);
                 } else {
-                    // A curve cannot be interpolated, this matching is wrong
+                    // A curve cannot be intrapolated, this matching is wrong
                     continue 'matching_loop;
                 }
             }
             // Check if any curves intersect with each other
-            if bezier_curves_intersection(&interpolated_curves) {
+            if bezier_curves_intersection(&intrapolated_curves) {
                 continue 'matching_loop;
             }
 
             if self.draw_util.display_control_points {
                 let color = Color::color(&ColorName::Black);
-                interpolated_curves.iter().for_each(|curve| {
+                intrapolated_curves.iter().for_each(|curve| {
                     curve.iter().for_each(|part| {
                         if let CompoundPathElement::Spline(part) = part {
                             self.draw_util.draw_cross_i32(&color, part.points[1].to_point_i32());
@@ -329,7 +329,7 @@ impl ShapeCompletor {
             }
             
             // Trust it to be the correct solution
-            return Some(interpolated_curves);
+            return Some(intrapolated_curves);
         }
 
         None

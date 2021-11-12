@@ -7,7 +7,7 @@ use super::{LineIntersectionResult, calculate_in_between_point, calculate_inters
 
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
-pub struct CurveInterpolatorConfig {
+pub struct CurveIntrapolatorConfig {
     // Smoothing
     pub outset_ratio: f64,
     pub min_segment_length: f64,
@@ -19,7 +19,7 @@ pub struct CurveInterpolatorConfig {
     pub control_points_retract_ratio: f64,
 }
 
-impl Default for CurveInterpolatorConfig {
+impl Default for CurveIntrapolatorConfig {
     fn default() -> Self {
         Self { 
             outset_ratio: 8.0,
@@ -35,16 +35,16 @@ impl Default for CurveInterpolatorConfig {
 
 
 
-/// Interpolate in-between curve given 2 curves
-pub struct CurveInterpolator {
-    pub config: CurveInterpolatorConfig,
+/// intrapolate in-between curve given 2 curves
+pub struct CurveIntrapolator {
+    pub config: CurveIntrapolatorConfig,
     pub hole_rect: BoundingRect,
     pub draw_util: DrawUtil,
 }
 
 // API
-impl CurveInterpolator {
-    pub fn new(config: CurveInterpolatorConfig, hole_rect: BoundingRect, draw_util: DrawUtil) -> Self {
+impl CurveIntrapolator {
+    pub fn new(config: CurveIntrapolatorConfig, hole_rect: BoundingRect, draw_util: DrawUtil) -> Self {
         Self {
             config,
             hole_rect,
@@ -52,11 +52,11 @@ impl CurveInterpolator {
         }
     }
 
-    /// Interpolate the imaginary curve between two existing curves.
-    /// The endpoints of the interpolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
+    /// intrapolate the imaginary curve between two existing curves.
+    /// The endpoints of the intrapolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn interpolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, correct_tail_tangents: bool) -> Option<CompoundPath> {
+    pub fn intrapolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, correct_tail_tangents: bool) -> Option<CompoundPath> {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -107,13 +107,13 @@ impl CurveInterpolator {
             self.draw_util.draw_line_f64(&color2, endpoint2, to_point2);
         }
         
-        //# Curve interpolation
+        //# Curve intrapolation
         self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, self.config.control_points_retract_ratio)
     }
 }
 
 // Helper functions
-impl CurveInterpolator {
+impl CurveIntrapolator {
     /// Apply the 4-point scheme subdivision on 'path' in a convolutional manner iteratively, preserving corners.
     /// The corners of the smoothed path are returned as a bool mask.
     /// Segments (at any point during iteration) shorter than 'min_segment_length' are not further subdivided.
