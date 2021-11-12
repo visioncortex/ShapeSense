@@ -1,10 +1,10 @@
 use wasm_bindgen::prelude::*;
 use super::{CurveInterpolatorConfig, draw::DisplaySelector};
 
-/// Configuration to Repairer
+/// Configuration to ShapeCompletor
 #[wasm_bindgen]
-pub struct RepairerConfig {
-    // Create a Repairer
+pub struct CompletorConfig {
+    // Create a ShapeCompletor
     canvas_id: String,
     pub display_selector: DisplaySelector,
     pub display_tangents: bool,
@@ -22,7 +22,7 @@ pub struct RepairerConfig {
     
 }
 
-impl Default for RepairerConfig {
+impl Default for CompletorConfig {
     fn default() -> Self {
         Self {
             canvas_id: "canvas_id".to_owned(),
@@ -42,7 +42,7 @@ impl Default for RepairerConfig {
 // WASM API
 #[wasm_bindgen]
 #[allow(non_snake_case)]
-impl RepairerConfig {
+impl CompletorConfig {
 
     #[wasm_bindgen(constructor)]
     pub fn new(canvas_id: &str) -> Self {
@@ -142,13 +142,13 @@ impl RepairerConfig {
 }
 
 // API
-impl RepairerConfig {
+impl CompletorConfig {
     pub fn get_canvas_id(&self) -> &str {
         &self.canvas_id
     }
 }
 
 // Helper functions
-impl RepairerConfig {
+impl CompletorConfig {
 
 }

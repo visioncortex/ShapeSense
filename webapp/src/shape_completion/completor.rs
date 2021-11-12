@@ -4,20 +4,20 @@ use bit_vec::BitVec;
 use visioncortex::{BinaryImage, BoundingRect, Color, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 use wasm_bindgen::prelude::*;
 
-use crate::{image_repair::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
+use crate::{shape_completion::{CurveInterpolator, CurveInterpolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
-use super::{FilledHoleMatrix, HoleFiller, Matching, RepairerConfig, draw::{DisplaySelector, DrawUtil}};
+use super::{FilledHoleMatrix, HoleFiller, Matching, CompletorConfig, draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
-pub struct Repairer {
+pub struct ShapeCompletor {
     image: BinaryImage,
     draw_util: DrawUtil,
 }
 
 // WASM API
 #[wasm_bindgen]
-impl Repairer {
-    pub fn repair_with_config(config: RepairerConfig) {
+impl ShapeCompletor {
+    pub fn complete_shape_with_config(config: CompletorConfig) {
         let draw_util = DrawUtil::new(config.get_canvas_id(), config.display_selector, config.display_tangents, config.display_control_points);
         let canvas = &draw_util.canvas;
 
@@ -37,9 +37,9 @@ impl Repairer {
             }
         }
 
-        let repairer = Self { image, draw_util };
+        let shape_completor = Self { image, draw_util };
 
-        let result = repairer.repair_and_draw_expandable(hole_rect, config.simplify_tolerance, config.curve_interpolator_config);
+        let result = shape_completor.complete_shape_and_draw_expandable(hole_rect, config.simplify_tolerance, config.curve_interpolator_config);
         
         match result {
             Ok(_) => {},
@@ -51,20 +51,20 @@ impl Repairer {
 }
 
 // API
-impl Repairer {
-    pub fn repair_and_draw(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+impl ShapeCompletor {
+    pub fn complete_shape_and_draw(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
-        let filled_hole = self.repair(hole_rect, simplify_tolerance, curve_interpolator_config)?;
+        let filled_hole = self.complete_shape(hole_rect, simplify_tolerance, curve_interpolator_config)?;
 
         self.draw_util.draw_filled_hole(filled_hole, hole_origin);
 
         Ok(())
     }
 
-    /// If repairing fails, expand along each side and take the first successful result.
-    pub fn repair_and_draw_expandable(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
+    /// If shape completion fails, expand along each side and take the first successful result.
+    pub fn complete_shape_and_draw_expandable(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
-        let filled_hole = match self.repair(hole_rect, simplify_tolerance, curve_interpolator_config) {
+        let filled_hole = match self.complete_shape(hole_rect, simplify_tolerance, curve_interpolator_config) {
             Ok(filled_hole) => filled_hole,
             Err(mut error) => {
                 error += "\n";
@@ -80,7 +80,7 @@ impl Repairer {
                         if 0 <= hole_rect.left && hole_rect.right <= self.image.width as i32
                             && 0 <= hole_rect.top && hole_rect.bottom <= self.image.height as i32 {
                             
-                            match self.repair(expanded_hole_rect, simplify_tolerance, curve_interpolator_config) {
+                            match self.complete_shape(expanded_hole_rect, simplify_tolerance, curve_interpolator_config) {
                                 Ok(filled_hole) => {
                                     return Ok(
                                         // Remove the expanded column/row
@@ -112,7 +112,7 @@ impl Repairer {
         Ok(())
     }
 
-    pub fn repair(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<FilledHoleMatrix, String> {
+    pub fn complete_shape(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveInterpolatorConfig) -> Result<FilledHoleMatrix, String> {
         //# Path walking
         let paths = self.get_test_paths();
 
@@ -162,7 +162,7 @@ impl Repairer {
 }
 
 // Helper functions
-impl Repairer {
+impl ShapeCompletor {
     fn get_test_paths(&self) -> Vec<PathI32> {        
         let clusters = self.image.to_clusters(false);
 

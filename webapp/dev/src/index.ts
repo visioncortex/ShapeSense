@@ -1,4 +1,4 @@
-import { DisplaySelector } from "image-repair";
+import { DisplaySelector } from "shape-completion";
 import { DrawingCanvas } from "./canvas";
 import { setUpCustomTest } from "./custom";
 import { runPredefinedTests } from "./predefined";

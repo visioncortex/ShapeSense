@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 pub mod canvas;
 pub mod common;
-pub mod image_repair;
+pub mod shape_completion;
 pub mod util;
 
 #[wasm_bindgen(start)]

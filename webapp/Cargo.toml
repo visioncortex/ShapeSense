@@ -1,5 +1,5 @@
 [package]
-name = "image-repair"
+name = "shape-completion"
 version = "0.1.0"
 authors = ["Sanford Pun <punsanford@gmail.com>"]
 edition = "2018"

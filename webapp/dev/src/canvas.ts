@@ -1,4 +1,4 @@
-import { DisplaySelector, Repairer, RepairerConfig } from "image-repair";
+import { DisplaySelector, ShapeCompletor, CompletorConfig } from "shape-completion";
 
 export class DrawingCanvas {
     canvas: HTMLCanvasElement;
@@ -83,7 +83,7 @@ export class DrawingCanvas {
         if (typeof this.holeRect === typeof undefined) {
             throw new Error("There is no hole defined for this canvas!");
         }
-        const config = new RepairerConfig(this.canvas.id)
+        const config = new CompletorConfig(this.canvas.id)
             .displaySelector(displaySelector)
             .displayTangents(displayTangents)
             .displayControlPoints(displayControlPoints)
@@ -93,7 +93,7 @@ export class DrawingCanvas {
                 this.holeRect.w,
                 this.holeRect.h,
             );
-        Repairer.repair_with_config(config);
+        ShapeCompletor.complete_shape_with_config(config);
     }
 
     addUpdateLastMousePositionListener(listener: (lastMousePosition: { x: number, y: number }) => void) {

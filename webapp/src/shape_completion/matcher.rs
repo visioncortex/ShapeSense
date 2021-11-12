@@ -3,7 +3,7 @@ use std::{collections::{HashMap, HashSet}, convert::TryInto};
 use permutator::{Combination, factorial, multiply_factorial};
 use visioncortex::PointF64;
 
-use crate::{image_repair::SquareDistanceMatrix, util::console_log_util};
+use crate::{shape_completion::SquareDistanceMatrix, util::console_log_util};
 
 use super::{MatchItem, MatchItemSet, Matching};
 

@@ -1,7 +1,7 @@
 use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
 use wasm_bindgen::prelude::*;
 
-use crate::{image_repair::find_new_point_from_4_point_scheme, util::console_log_util};
+use crate::{shape_completion::find_new_point_from_4_point_scheme, util::console_log_util};
 
 use super::{LineIntersectionResult, calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
 
