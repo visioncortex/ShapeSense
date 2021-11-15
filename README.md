@@ -14,7 +14,7 @@ Blue pixels will be used to denote the outline of the recovered parts of the sha
 
 The whole process of shape completion involves intrapolating the missing outline and then filling the pixels in the hole with appropriate colors.
 
-## Simple Shape Completion
+# Simple Shape Completion
 
 Let's begin the experiment with simple shapes, like an ellipse.
 
@@ -22,7 +22,7 @@ Let's begin the experiment with simple shapes, like an ellipse.
 ![Ellipse with hole](images/simple/ellipse_with_hole.png)
 The first image is the ground truth (for reference only). The second image is the input to the ShapeCompletion pipeline.
 
-### Path Preprocessing
+## Path Preprocessing
 
 The first stage of the pipeline is to obtain and process the paths (curves) representing the existing outline of the shape.
 
@@ -31,7 +31,7 @@ The first stage of the pipeline is to obtain and process the paths (curves) repr
 ![Path segments after preprocessing](images/simple/ellipse_preprocessed_process.png)
 Yellow pixels denote the identified outline of the shape after simplification.
 
-### Tail Tangent Approximation
+## Tail Tangent Approximation
 
 The first step in the pipeline is to extract the two curves from the two endpoints; smoothing is performed to better approximate the tangents near the endpoints (*tails* of the whole curve). After this step, we will obtain two tangents (2-D direction vectors), one at each tail. We will call these tangents *tail tangents*.
 
@@ -42,7 +42,7 @@ A number of factors determine the accuracy and robustness of tail tangent approx
 
 <hr>
 
-### Intrapolation
+## Intrapolation
 
 <details>
     <summary>Why "<i>Intra</i>polation"?</summary>
@@ -87,7 +87,7 @@ The case of our simple ellipse falls into the first scenario. The intrapolated o
 
 ![Ellipse after intrapolation](images/simple/ellipse_intrapolated.png)
 
-### Color filling
+## Color filling
 
 To fill the hole with appropriate colors, we define three element types: *Blank*, *Structure*, and *Texture*.
 
