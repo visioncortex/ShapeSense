@@ -142,15 +142,13 @@ impl DrawUtil {
         let structure = Color::get_palette_color(4);
         let texture = Color::color(&ColorName::Red);
 
-        let white = Color::color(&ColorName::White);
-
         for i in 0..filled_hole.height {
             for j in 0..filled_hole.width {
                 let target = origin + PointI32::new(j as i32, i as i32);
                 let color = match filled_hole[i][j] {
-                    super::FilledHoleElement::Blank => white, //blank,
+                    super::FilledHoleElement::Blank => blank,
                     super::FilledHoleElement::Structure => structure,
-                    super::FilledHoleElement::Texture => white, //texture,
+                    super::FilledHoleElement::Texture => texture,
                 };
                 self.draw_pixel_i32(&color, target);
             }

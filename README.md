@@ -86,3 +86,33 @@ The final scenario is trivial to handle: when the lines are coincident, simply c
 The case of our simple ellipse falls into the first scenario. The intrapolated outline is shown as follows:
 
 ![Ellipse after intrapolation](images/simple/ellipse_intrapolated.png)
+
+### Color filling
+
+To fill the hole with appropriate colors, we define three element types: *Blank*, *Structure*, and *Texture*.
+
+Element     |Description
+:-----------|:----------
+Blank       |Background pixels; Default elements in the hole.
+Structure   |Outline of the shape; The intrapolated curve(s) obtained above is rasterized and drawn onto the hole.
+Texture     |Solid part of the shape; To be filled in this section.
+
+The Structure elements divide the hole into several subregions. Each of these subregions is either Blank or Texture elements.
+
+![Hole of ellipse divided into two subregions](images/simple/filling_subregions.png)
+
+In our example, the hole is divided by the intrapolated curve into two subregions. In order to guess whether to fill the subregions with Blank or Texture elements, we take majority votes among the pixels around the hole.
+
+For the bottom subregion, the pixels right outside the bottom boundary are mostly red (Texture), therefore this subregion is classified as Texture and filled with Texture elements.
+
+For the top subregion, the pixels outside the left, top, and right sides of the boundary are considered. Most of those pixels are background (Blank), so this subregion is classified as Blank.
+
+After filling, the shape of the ellipse is completed, as follows:
+
+![Complete ellipse](images/simple/ellipse_complete.png)
+
+<hr>
+
+If we move the hole around, shape completion yields the following results:
+
+![Complete ellipses with different holes](images/simple/ellipse_diff_holes.png)
