@@ -116,3 +116,35 @@ After filling, the shape of the ellipse is completed, as follows:
 If we move the hole around, shape completion yields the following results:
 
 ![Complete ellipses with different holes](images/simple/ellipse_diff_holes.png)
+
+# Complex Shape Completion
+
+The process of shape completion shown above has been rather straightforward because there is a strong assumption - the hole cuts the shape at exactly 2 endpoints only. Consider the following case:
+
+![Ellipse with a long hole cutting its boundary at 4 endpoints](images/complex/ellipse_hole_across.png)
+At a glance, we can tell how should the endpoints be grouped - top-left with bottom-left, top-right with bottom-right, but how can we model the problem to match the endpoints such that the result of color filling always makes sense?
+
+## Endpoint Matching
+
+### Failed attempt: Local Proximity
+
+An intuitive approach to perform matching may be by endpoint proximity in a greedy manner. If we simply connect each endpoint to its nearest neighbor, the correct matching is found for the above case. However, this approach ceases to work for the following case:
+
+![Tall hole over ellipse.](images/complex/ellipse_local_proximity_counterexample.png)
+The correct matching seems to be (top-left with bottom-left, top-right with bottom-right), but the top two endpoints are the closest.
+
+### Avoiding Intersections
+
+Problematic matchings are the ones that lead to intersecting curves. If intersection occurs, the resulting shape deforms and there may be subregions that are surrounded by others, leading to challenges in color filling. Therefore, the key of endpoint matching lies in **avoiding intersections**.
+
+Before intrapolation, some intersecting curves can already be identified by looking at endpoint connections that intersect.
+
+Imagine we have 4 endpoints A, B, C, and D. If the line segment AB intersects with CD, then the curve intrapolated from A to B must intersect with that from C to D.
+
+![Line intersection among endpoints implies intersection of intrapolated curves](images/complex/line_intersect_implies_curve_intersect.png)
+
+Therefore, the first step to avoid intersecting curves is to filter out matchings that contain intersecting lines.
+
+This [webpage](https://prase.cz/kalva/putnam/psoln/psol794.html) shows that minimizing the total length of endpoint connections is equivalent to finding a matching with no intersecting connections. Hence the problem is reduced to a [Euclidean Bipartite Matching Problem](https://core.ac.uk/download/pdf/82212931.pdf), i.e. optimizing the global weights over matchings. The [Hungarian algorithm](https://en.wikipedia.org/wiki/Hungarian_algorithm) is used to solve such a problem.
+
+The rest of the intersecting curves have to be caught and filtered out after intrapolation. Bézier curve intersection can be detected by a recursive method called [De Casteljau's (Bézier Clipping) algorithm](https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm), which is implemented in [flo_curves](https://crates.io/crates/flo_curves), the Bézier curve library we use.
