@@ -33,12 +33,12 @@ Yellow pixels denote the identified outline of the shape after simplification.
 
 ## Tail Tangent Approximation
 
-The first step in the pipeline is to extract the two curves from the two endpoints; smoothing is performed to better approximate the tangents near the endpoints (*tails* of the whole curve). After this step, we will obtain two tangents (2-D direction vectors), one at each tail. We will call these tangents *tail tangents*.
+The next step is to (divide, if needed, and) extract the two curves from the two endpoints; smoothing is performed to better approximate the tangents near the endpoints (*tails* of the whole curve). After this step, we will obtain two tangents (2-D direction vectors), one at each tail. We will call these tangents *tail tangents*.
 
 ![Tail tangent approximation](images/simple/tail_tangent_approx.png)
-After discrete rasterization, even a theoretically smooth curve will contain sharp corners. The naive approach is to simply take A as the tail tangent, but better (more practical/useful) approximations may be obtained by taking more subsequent segments into account (e.g. B,C,D).
+The naive approach is to simply take A as the tail tangent, but better (more practical/useful) approximations may be obtained by taking more subsequent segments into account (e.g. B, C, D).
 
-A number of factors determine the accuracy and robustness of tail tangent approximation. Our implementation takes into account how many points to consider from the tails, how long should the segments being considered accumulate to, and how the weights for each segment should differ towards the tails.
+A number of factors determine the accuracy and robustness of tail tangent approximation. Our implementation supports configurations like how many points to consider from the tails, how long should the segments being considered accumulate to, and how the weights for each segment should change towards the tails.
 
 <hr>
 
@@ -47,37 +47,38 @@ A number of factors determine the accuracy and robustness of tail tangent approx
 <details>
     <summary>Why "<i>Intra</i>polation"?</summary>
     <p>
-        If we considered the existing outline of the shape as separate curves at each endpoint, we would be doing *<b>inter</b>polation* **between** curves. However, in this project, we are focusing on curves that form an outline of a shape, so we argue that we are doing *<b>intra</b>polation* **within** curves.
+        If we considered the existing outline of the shape as separate curves at each endpoint, we would be doing <i><b>inter</b>polation</i> <b>between</b> curves. However, in this project, we are focusing on curves (existing + missing) that form an outline of a single shape, so we argue that we are doing <i><b>intra</b>polation</i> <b>within</b> a curve.
     </p>
     <hr>
 </details>
 
-With the two endpoints and their corresponding tail tangents, we can calculate the missing part in different scenarios. The type of curves used in this project is cubic [Bézier curves](https://en.wikipedia.org/wiki/B%C3%A9zier_curve). To specify such a curve, four points are required.
+With the two endpoints and their corresponding tail tangents, we can calculate for the missing part in different scenarios. The type of curves used in this project is cubic [Bézier curves](https://en.wikipedia.org/wiki/B%C3%A9zier_curve). To specify such a curve, four points are required. An important property to note about this type of curves is that *the curve constructed is always fully contained in the quadrilateral defined by the four points*.
 
-The first scenario is when the two tail tangents point to the same side with respect to the line connecting the two endpoints (we denote this line as the *base*).
+The first scenario is when the two tail tangents point to the same side with respect to the line connecting the two endpoints (we call this line the *base*).
 
 ![Intrapolation when both tail tangents point to the same side](images/simple/intrapolate_same_side.png)
-Both tail tangents at A and B point to the same side of the red line (the base).
+Both tail tangents at A and B point to the same side of the red, dashed line (the base).
 
-To construct the curve between A and B, we need to identify two *control points* (C<sub>A</sub> and C<sub>B</sub>) between them. In our approach, we started with what we think is intuitive and made tweaks to resolve practical issues; this is what we end up with:
+To construct the curve between A and B, we need to identify two *control points* (C<sub>A</sub> and C<sub>B</sub>) between them. In our approach, we started with what we think is intuitive and made tweaks to resolve some issues in practice; this is what we end up with:
 
-First, find the intersection of the two lines starting at A and B along the corresponding tail tangent. C<sub>A</sub> and C<sub>B</sub> are then set to be the mid-point between A/B and the intersection. If the intersection is too far away (i.e. the two lines are close to parallel), we simply use a point on each of the lines as the control points (e.g. translate A/B along tail tangent by a factor of base length). Either way, if either C<sub>A</sub> or C<sub>B</sub> end up lying outside the hole region, we *retract* it by pushing it towards the endpoint, until it reaches the hole region.
+First, find the intersection of the two lines starting at A and B along the corresponding tail tangent. The mid-points between A/B and the intersection are then set to be C<sub>A</sub> and C<sub>B</sub>. If the intersection is too far away (i.e. the two lines are close to, if not exactly, parallel), we simply use a point on each line as the control points (e.g. translate A/B along their tail tangent by a factor of base length). Either way, if either C<sub>A</sub> or C<sub>B</sub> end up lying outside the hole region, we *retract* it by pushing it towards the endpoint, until it reaches the hole region.
 
 <details>
-    <summary>What if the intersection is in the other direction?</summary>
+    <summary>What if the intersection was in the other direction?</summary>
     <img src="./images/simple/intrapolation_bent_outwards.png" alt="Tail tangents bent outwards; pulled back to be perpendicular to the base." />
     <p>
-        If the line originating at A and B intersect in the negative direction (as shown above), we simply *correct* them by bending them inwards to be perpendicular with the base.
+        If the line originating from A and B intersect in the negative direction (as shown above), we simply <i>correct</i> them by bending them inwards to be perpendicular with the base.
     </p>
+    <hr>
 </details>
 
-The other scenario is when the two tail tangents point to different sides of the base, as below.
+Another scenario is when the two tail tangents point to different sides of the base, as below.
 
 ![Intrapolation with tail tangents pointing to different sides of the base](images/simple/intrapolate_diff_sides.png) A simple dot product operation can be used to detect such a scenario.
 
-In this case, any intersections detected are meaningless. Instead, we divide the curve into two and intrapolate two subcurves from each endpoint to the mid-point of the base as shown above.
+In this case, any intersections detected are meaningless because they must lie outside the hole region. Instead, we divide the curve into two halves and intrapolate two subcurves from each endpoint to the mid-point of the base as shown above.
 
-The final scenario is trivial to handle: when the lines are coincident, simply connect the endpoints.
+The last possible scenario is trivial to handle: when the lines are coincident, simply connect the endpoints with a straight line.
 
 ![Intrapolation becomes connecting endpoints with a straight line in coincidence](images/simple/intrapolate_coincidence.png)
 
@@ -87,17 +88,19 @@ The case of our simple ellipse falls into the first scenario. The intrapolated o
 
 ![Ellipse after intrapolation](images/simple/ellipse_intrapolated.png)
 
+<hr>
+
 ## Color filling
 
-To fill the hole with appropriate colors, we define three element types: *Blank*, *Structure*, and *Texture*.
+To fill the hole with appropriate colors, we define three element types: *Blank*, *Structure*, and *Texture*. Note that in this project, it is restricted that only one shape is processed at once, and actual texture recovery is not performed - we're only interested in knowing which parts of the hole are Blank, Structure, or Texture.
 
 Element     |Description
 :-----------|:----------
-Blank       |Background pixels; Default elements in the hole.
-Structure   |Outline of the shape; The intrapolated curve(s) obtained above is rasterized and drawn onto the hole.
-Texture     |Solid part of the shape; To be filled in this section.
+Blank       |Background pixels. (Black in our demo)
+Structure   |Outline of the shape; The intrapolated curve(s) obtained above is rasterized and drawn onto the hole. (Blue in our demo)
+Texture     |Solid part of the shape; To be filled in this section. (Red in our demo)
 
-The Structure elements divide the hole into several subregions. Each of these subregions is either Blank or Texture elements.
+The Structure elements divide the hole into several subregions. Each of these subregions contains wholly either Blank or Texture elements.
 
 ![Hole of ellipse divided into two subregions](images/simple/filling_subregions.png)
 
@@ -105,7 +108,7 @@ In our example, the hole is divided by the intrapolated curve into two subregion
 
 For the bottom subregion, the pixels right outside the bottom boundary are mostly red (Texture), therefore this subregion is classified as Texture and filled with Texture elements.
 
-For the top subregion, the pixels outside the left, top, and right sides of the boundary are considered. Most of those pixels are background (Blank), so this subregion is classified as Blank.
+For the top subregion, the pixels outside the left, top, and right sides of the boundary are considered. All of those pixels are background (Blank), so this subregion is classified as Blank.
 
 After filling, the shape of the ellipse is completed, as follows:
 
@@ -122,20 +125,22 @@ If we move the hole around, shape completion yields the following results:
 The process of shape completion shown above has been rather straightforward because there is a strong assumption - the hole cuts the shape at exactly 2 endpoints only. Consider the following case:
 
 ![Ellipse with a long hole cutting its boundary at 4 endpoints](images/complex/ellipse_hole_across.png)
-At a glance, we can tell how should the endpoints be grouped - top-left with bottom-left, top-right with bottom-right, but how can we model the problem to match the endpoints such that the result of color filling always makes sense?
+At a glance, we can tell how the endpoints should be grouped - A with B, and C with D, but how can we model the problem to match the endpoints such that the result of color filling always makes sense?
+
+<hr>
 
 ## Endpoint Matching
 
 ### Failed attempt: Local Proximity
 
-An intuitive approach to perform matching may be by endpoint proximity in a greedy manner. If we simply connect each endpoint to its nearest neighbor, the correct matching is found for the above case. However, this approach ceases to work for the following case:
+An intuitive approach might be by endpoint proximity in a greedy manner. If we simply connect each endpoint to its nearest neighbor, the correct matching is found for the above case. However, this approach ceases to work for the following case:
 
 ![Tall hole over ellipse.](images/complex/ellipse_local_proximity_counterexample.png)
-The correct matching seems to be (top-left with bottom-left, top-right with bottom-right), but the top two endpoints are the closest.
+The correct matching seems to be A with B and C with D, but the top two endpoints are the closest.
 
 ### Avoiding Intersections
 
-Problematic matchings are the ones that lead to intersecting curves. If intersection occurs, the resulting shape deforms and there may be subregions that are surrounded by others, leading to challenges in color filling. Therefore, the key of endpoint matching lies in **avoiding intersections**.
+Problematic matchings are the ones that lead to intersecting curves. If intersection occurs, the resulting shape deforms and there may be subregions that are surrounded by others, leading to problems in color filling. Therefore, the key of endpoint matching lies in **avoiding intersections**.
 
 Before intrapolation, some intersecting curves can already be identified by looking at endpoint connections that intersect.
 
@@ -143,8 +148,8 @@ Imagine we have 4 endpoints A, B, C, and D. If the line segment AB intersects wi
 
 ![Line intersection among endpoints implies intersection of intrapolated curves](images/complex/line_intersect_implies_curve_intersect.png)
 
-Therefore, the first step to avoid intersecting curves is to filter out matchings that contain intersecting lines.
+Therefore, the first step to avoiding intersecting curves is to filter out matchings that contain intersecting lines.
 
 This [webpage](https://prase.cz/kalva/putnam/psoln/psol794.html) shows that minimizing the total length of endpoint connections is equivalent to finding a matching with no intersecting connections. Hence the problem is reduced to a [Euclidean Bipartite Matching Problem](https://core.ac.uk/download/pdf/82212931.pdf), i.e. optimizing the global weights over matchings. The [Hungarian algorithm](https://en.wikipedia.org/wiki/Hungarian_algorithm) is used to solve such a problem.
 
-The rest of the intersecting curves have to be caught and filtered out after intrapolation. Bézier curve intersection can be detected by a recursive method called [De Casteljau's (Bézier Clipping) algorithm](https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm), which is implemented in [flo_curves](https://crates.io/crates/flo_curves), the Bézier curve library we use.
+The rest of the intersecting curves have to be caught and filtered out after intrapolation has taken place. Bézier curve intersection can be detected by a recursive method called [De Casteljau's (Bézier Clipping) algorithm](https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm), which is implemented in [flo_curves](https://crates.io/crates/flo_curves), the Bézier curve library we use.
