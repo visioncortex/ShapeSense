@@ -153,3 +153,19 @@ Therefore, the first step to avoiding intersecting curves is to filter out match
 This [webpage](https://prase.cz/kalva/putnam/psoln/psol794.html) shows that minimizing the total length of endpoint connections is equivalent to finding a matching with no intersecting connections. Hence the problem is reduced to a [Euclidean Bipartite Matching Problem](https://core.ac.uk/download/pdf/82212931.pdf), i.e. optimizing the global weights over matchings. The [Hungarian algorithm](https://en.wikipedia.org/wiki/Hungarian_algorithm) is used to solve such a problem.
 
 The rest of the intersecting curves have to be caught and filtered out after intrapolation has taken place. Bézier curve intersection can be detected by a recursive method called [De Casteljau's (Bézier Clipping) algorithm](https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm), which is implemented in [flo_curves](https://crates.io/crates/flo_curves), the Bézier curve library we use.
+
+# Stability and Robustness
+
+Throughout the process of development, we encountered many edge cases where the pipeline would break down when faced with certain geometrical configurations. For example, an endpoint detected at the corner of the hole may or may not be useful, because it may be an edge entering the hole at a corner, or it may just be the hole touching an edge with its corner.
+
+As much as we hope to correctly handle every single situation (if it's possible in the first place), we figured, from an engineering perspective, that we want an effective way to secure maximum overall robustness with a reasonable amount of effort.
+
+From experimentation, we observed that most of the pain-inducing geometrical configurations were deformed once we move the hole by just 1 pixel. Therefore, we decided that once the pipeline breaks down, it should try to **recover by expanding the hole by 1 pixel in each direction**. If it successfully produces something in one of these attempts, that result is used.
+
+<hr>
+
+![Animated Demo](images/animated_demo.gif)
+
+As shown above, the performance of our implementation is stable for the most part. Occasionally, the pipeline incorrectly handles the cases when tail tangents are (nearly) coincident to the hole boundaries.
+
+![Breaks down when tail tangents are coincident to boundary](images/unstability.png)
