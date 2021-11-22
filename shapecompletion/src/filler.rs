@@ -243,7 +243,7 @@ impl HoleFiller {
                     sample_point(sampled_mid_point, current_point),
                 ];
 
-                sampled_points.iter().for_each(|&sampled_point| {
+                IntoIterator::into_iter(sampled_points).for_each(|sampled_point| {
                     let inside_point = eval_inside_point(sampled_point);
                     Self::fill_hole_iterative(&mut matrix, inside_point - offset);
                 });
@@ -296,17 +296,18 @@ impl HoleFiller {
                         )
                     } else {
                         // Should be adjusted to one of the corners
-                        *([
-                            hole_rect.top_left(),
-                            hole_rect.top_right(),
-                            hole_rect.bottom_left(),
-                            hole_rect.bottom_right(),
-                        ]
-                        .iter()
+                        IntoIterator::into_iter(
+                            [
+                                hole_rect.top_left(),
+                                hole_rect.top_right(),
+                                hole_rect.bottom_left(),
+                                hole_rect.bottom_right(),
+                            ]
+                        )
                         .min_by_key(|&corner| {
                             endpoint.to_point_f64().distance_to(corner.to_point_f64()) as i32
                         })
-                        .unwrap())
+                        .unwrap()
                     }
                 }
             })
@@ -370,16 +371,16 @@ impl HoleFiller {
             // Fill it
             matrix[point_usize] = FilledHoleElement::Texture;
 
-            [
-                point + PointI32::new(1, 0),
-                point + PointI32::new(0, 1),
-                point + PointI32::new(-1, 0),
-                point + PointI32::new(0, -1),
-            ]
-                .iter()
-                .for_each(|neighbor| {
-                    stack.push(*neighbor);
-                });
+            IntoIterator::into_iter(
+                [
+                    point + PointI32::new(1, 0),
+                    point + PointI32::new(0, 1),
+                    point + PointI32::new(-1, 0),
+                    point + PointI32::new(0, -1),
+                ]
+            ).for_each(|neighbor| {
+                stack.push(neighbor);
+            });
         }
     }
 }

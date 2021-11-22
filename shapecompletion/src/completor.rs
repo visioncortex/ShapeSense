@@ -61,7 +61,7 @@ impl ShapeCompletor {
                         BoundingRect::new_x_y_w_h(x, y, w + 1, h),     // Expanded to the right
                         BoundingRect::new_x_y_w_h(x, y, w, h + 1),     // Expanded downward
                     ];
-                    for (i, &expanded_hole_rect) in expanded_hole_rects.iter().enumerate() {
+                    for (i, expanded_hole_rect) in IntoIterator::into_iter(expanded_hole_rects).enumerate() {
                         if 0 <= hole_rect.left
                             && hole_rect.right <= self.image.width as i32
                             && 0 <= hole_rect.top
