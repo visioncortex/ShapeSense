@@ -138,15 +138,11 @@ impl ShapeCompletor {
                     correct_tail_tangents
                 )
             };
-            let mut option = try_intrapolation(false); // First try interpolation without correcting tail tangents
-            if option.is_none() {
-                option = try_intrapolation(true);
-                if option.is_none() {
-                    return Err("Still not intrapolated.".into());
-                };
-            };
-
-            option.unwrap()
+            // First try intrapolation without correcting tail tangents
+            match try_intrapolation(false).or_else(|| {try_intrapolation(true)}) {
+                Some(curves) => curves,
+                None => return Err("Still not intrapolated.".into()),
+            }
         };
 
         let endpoints: Vec<PointI32> = path_segments
