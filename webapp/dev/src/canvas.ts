@@ -1,4 +1,4 @@
-import { DisplaySelector, ShapeCompletor, CompletorConfig } from "shape-completion";
+import { DisplaySelector, ShapeCompletor, ShapeCompletorAPIConfig } from "shape-completion";
 
 export class DrawingCanvas {
     canvas: HTMLCanvasElement;
@@ -83,7 +83,7 @@ export class DrawingCanvas {
         if (typeof this.holeRect === typeof undefined) {
             throw new Error("There is no hole defined for this canvas!");
         }
-        const config = new CompletorConfig(this.canvas.id)
+        const config = new ShapeCompletorAPIConfig(this.canvas.id)
             .displaySelector(displaySelector)
             .displayTangents(displayTangents)
             .displayControlPoints(displayControlPoints)

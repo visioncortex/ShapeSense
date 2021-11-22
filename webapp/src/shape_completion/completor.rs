@@ -6,18 +6,20 @@ use wasm_bindgen::prelude::*;
 
 use crate::{shape_completion::{CurveIntrapolator, CurveIntrapolatorConfig, MatchItem, MatchItemSet, Matcher, bezier_curves_intersection}, util::{console_log_debug_util, console_log_util}};
 
-use super::{FilledHoleMatrix, HoleFiller, Matching, CompletorConfig, draw::{DisplaySelector, DrawUtil}};
+use super::{FilledHoleMatrix, HoleFiller, Matching, ShapeCompletorAPIConfig, draw::{DisplaySelector, DrawUtil}};
 
 #[wasm_bindgen]
 pub struct ShapeCompletor {
     image: BinaryImage,
+    simplify_tolerance: f64,
+    curve_intrapolator_config: CurveIntrapolatorConfig,
     draw_util: DrawUtil,
 }
 
 // WASM API
 #[wasm_bindgen]
 impl ShapeCompletor {
-    pub fn complete_shape_with_config(config: CompletorConfig) {
+    pub fn complete_shape_with_config(config: ShapeCompletorAPIConfig) {
         let draw_util = DrawUtil::new(config.get_canvas_id(), config.display_selector, config.display_tangents, config.display_control_points);
         let canvas = &draw_util.canvas;
 
@@ -37,9 +39,9 @@ impl ShapeCompletor {
             }
         }
 
-        let shape_completor = Self { image, draw_util };
+        let shape_completor = Self { image, simplify_tolerance: config.simplify_tolerance, curve_intrapolator_config: config.curve_intrapolator_config, draw_util };
 
-        let result = shape_completor.complete_shape_and_draw_expandable(hole_rect, config.simplify_tolerance, config.curve_interpolator_config);
+        let result = shape_completor.complete_shape_and_draw_expandable(hole_rect);
         
         match result {
             Ok(_) => {},
@@ -52,9 +54,9 @@ impl ShapeCompletor {
 
 // API
 impl ShapeCompletor {
-    pub fn complete_shape_and_draw(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveIntrapolatorConfig) -> Result<(), String> {
+    pub fn complete_shape_and_draw(&self, hole_rect: BoundingRect) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
-        let filled_hole = self.complete_shape(hole_rect, simplify_tolerance, curve_interpolator_config)?;
+        let filled_hole = self.complete_shape(hole_rect)?;
 
         self.draw_util.draw_filled_hole(filled_hole, hole_origin);
 
@@ -62,9 +64,9 @@ impl ShapeCompletor {
     }
 
     /// If shape completion fails, expand along each side and take the first successful result.
-    pub fn complete_shape_and_draw_expandable(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveIntrapolatorConfig) -> Result<(), String> {
+    pub fn complete_shape_and_draw_expandable(&self, hole_rect: BoundingRect) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
-        let filled_hole = match self.complete_shape(hole_rect, simplify_tolerance, curve_interpolator_config) {
+        let filled_hole = match self.complete_shape(hole_rect) {
             Ok(filled_hole) => filled_hole,
             Err(mut error) => {
                 error += "\n";
@@ -80,7 +82,7 @@ impl ShapeCompletor {
                         if 0 <= hole_rect.left && hole_rect.right <= self.image.width as i32
                             && 0 <= hole_rect.top && hole_rect.bottom <= self.image.height as i32 {
                             
-                            match self.complete_shape(expanded_hole_rect, simplify_tolerance, curve_interpolator_config) {
+                            match self.complete_shape(expanded_hole_rect) {
                                 Ok(filled_hole) => {
                                     return Ok(
                                         // Remove the expanded column/row
@@ -112,12 +114,12 @@ impl ShapeCompletor {
         Ok(())
     }
 
-    pub fn complete_shape(&self, hole_rect: BoundingRect, simplify_tolerance: f64, curve_interpolator_config: CurveIntrapolatorConfig) -> Result<FilledHoleMatrix, String> {
+    pub fn complete_shape(&self, hole_rect: BoundingRect) -> Result<FilledHoleMatrix, String> {
         //# Path walking
         let paths = self.get_test_paths();
 
         //# Path identification, segmentation, and simplification
-        let path_segments = self.find_simplified_segments_from_paths(&hole_rect, paths, simplify_tolerance);
+        let path_segments = self.find_simplified_segments_from_paths(&hole_rect, paths);
 
         if path_segments.is_empty() {
             return Ok(FilledHoleMatrix::new(hole_rect.width() as usize, hole_rect.height() as usize));
@@ -133,7 +135,6 @@ impl ShapeCompletor {
                     hole_rect,
                     &matchings,
                     &path_segments,
-                    curve_interpolator_config,
                     correct_tail_tangents
                 )
             };
@@ -147,10 +148,6 @@ impl ShapeCompletor {
 
             option.unwrap()
         };
-
-        // intrapolated_curves.into_iter().for_each(|curve| {
-        //     self.draw_util.draw_compound_path(&Color::color(&ColorName::Red), &curve)
-        // });
 
         let endpoints: Vec<PointI32> = path_segments
             .into_iter()
@@ -180,13 +177,12 @@ impl ShapeCompletor {
             .collect()
     }
 
-    // The larger the tolerance, the fewer points will be left in output path.
-    fn find_simplified_segments_from_paths(&self, hole_rect: &BoundingRect, paths: Vec<PathI32>, simplify_tolerance: f64) -> Vec<PathI32> {
+    fn find_simplified_segments_from_paths(&self, hole_rect: &BoundingRect, paths: Vec<PathI32>) -> Vec<PathI32> {
         let mut endpoints = HashSet::new();
         paths
             .into_iter()
             .map(|path| {
-                self.find_segments_on_path_with_unique_endpoints(hole_rect, path, &mut endpoints, simplify_tolerance)
+                self.find_segments_on_path_with_unique_endpoints(hole_rect, path, &mut endpoints)
             })
             .flatten()
             .collect()
@@ -194,7 +190,7 @@ impl ShapeCompletor {
 
     /// Return a vector of *simplified* path segments whose heads are endpoints, pointing outwards from hole_rect.
     /// Segments are walked until 'max_num_points' is reached or another boundary point is reached, whichever happens first.
-    fn find_segments_on_path_with_unique_endpoints(&self, hole_rect: &BoundingRect, path: PathI32, current_endpoints: &mut HashSet<PointI32>, simplify_tolerance: f64) -> Vec<PathI32> {
+    fn find_segments_on_path_with_unique_endpoints(&self, hole_rect: &BoundingRect, path: PathI32, current_endpoints: &mut HashSet<PointI32>) -> Vec<PathI32> {
         let path = path.to_open();
         let len = path.len();
         let is_boundary_mask = BitVec::from_fn(len, |i| {
@@ -214,7 +210,7 @@ impl ShapeCompletor {
         endpoints_iter.filter_map(|endpoint| {
             let inserted = current_endpoints.insert(path[endpoint]);
             if inserted {
-                match self.walk_segment(&path, endpoint, &is_boundary_mask, simplify_tolerance) {
+                match self.walk_segment(&path, endpoint, &is_boundary_mask) {
                     Ok(segment) => Some(segment),
                     Err(error) => panic!("{}", error),
                 }
@@ -225,7 +221,7 @@ impl ShapeCompletor {
     }
 
     /// The behavior is undefined unless path.len() == is_boundary_mask.len().
-    fn walk_segment(&self, path: &PathI32, endpoint_index: usize, is_boundary_mask: &BitVec<u32>, simplify_tolerance: f64) -> Result<PathI32, String> {
+    fn walk_segment(&self, path: &PathI32, endpoint_index: usize, is_boundary_mask: &BitVec<u32>) -> Result<PathI32, String> {
         if path.len() != is_boundary_mask.len() {
             return Err("Length of path must be equal to length of boundary mask.".into());
         }
@@ -257,7 +253,7 @@ impl ShapeCompletor {
         }
 
         // Simplify 'path_segment'
-        Ok(PathI32::from_points(visioncortex::reduce::reduce(&path_segment.path, simplify_tolerance)))
+        Ok(PathI32::from_points(visioncortex::reduce::reduce(&path_segment.path, self.simplify_tolerance)))
     }
 
     /// The behavior is undefined unless 'path_segments' has an even number of elements.
@@ -287,10 +283,9 @@ impl ShapeCompletor {
         hole_rect: BoundingRect,
         matchings: &[Matching],
         path_segments: &[PathI32],
-        curve_interpolator_config: CurveIntrapolatorConfig,
         correct_tail_tangents: bool // Not a configuration, but a fail-safe feature
     ) -> Option<Vec<CompoundPath> > {
-        let curve_interpolator = CurveIntrapolator::new(curve_interpolator_config, hole_rect, self.draw_util.clone());
+        let curve_intrapolator = CurveIntrapolator::new(self.curve_intrapolator_config, hole_rect, self.draw_util.clone());
 
         'matching_loop: for matching in matchings.iter() {
             let mut intrapolated_curves = vec![];
@@ -304,7 +299,7 @@ impl ShapeCompletor {
                     self.draw_util.draw_path_f64(&color2, &curve2);
                 }
                 
-                if let Some(intrapolated_curve) = curve_interpolator.intrapolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents) {
+                if let Some(intrapolated_curve) = curve_intrapolator.intrapolate_curve_between_curves(curve1, curve2, false, false, correct_tail_tangents) {
                     intrapolated_curves.push(intrapolated_curve);
                 } else {
                     // A curve cannot be intrapolated, this matching is wrong

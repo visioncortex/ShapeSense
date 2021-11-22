@@ -3,7 +3,7 @@ use super::{CurveIntrapolatorConfig, draw::DisplaySelector};
 
 /// Configuration to ShapeCompletor
 #[wasm_bindgen]
-pub struct CompletorConfig {
+pub struct ShapeCompletorAPIConfig {
     // Create a ShapeCompletor
     canvas_id: String,
     pub display_selector: DisplaySelector,
@@ -17,12 +17,12 @@ pub struct CompletorConfig {
     // Simplify path segments
     pub simplify_tolerance: f64,
 
-    // Curve interpolator
-    pub curve_interpolator_config: CurveIntrapolatorConfig,
+    // Curve intrrpolator
+    pub curve_intrapolator_config: CurveIntrapolatorConfig,
     
 }
 
-impl Default for CompletorConfig {
+impl Default for ShapeCompletorAPIConfig {
     fn default() -> Self {
         Self {
             canvas_id: "canvas_id".to_owned(),
@@ -34,7 +34,7 @@ impl Default for CompletorConfig {
             hole_width: 15,
             hole_height: 15,
             simplify_tolerance: 2.0,
-            curve_interpolator_config: Default::default(),
+            curve_intrapolator_config: Default::default(),
         }
     }
 }
@@ -42,7 +42,7 @@ impl Default for CompletorConfig {
 // WASM API
 #[wasm_bindgen]
 #[allow(non_snake_case)]
-impl CompletorConfig {
+impl ShapeCompletorAPIConfig {
 
     #[wasm_bindgen(constructor)]
     pub fn new(canvas_id: &str) -> Self {
@@ -106,49 +106,49 @@ impl CompletorConfig {
     // CurveInterpolatorConfig
 
     pub fn curveOutsetRatio(mut self, value: f64) -> Self {
-       self.curve_interpolator_config.outset_ratio = value;
+       self.curve_intrapolator_config.outset_ratio = value;
        self
     }
 
     pub fn curveMinSegmentLength(mut self, value: f64) -> Self {
-       self.curve_interpolator_config.min_segment_length = value;
+       self.curve_intrapolator_config.min_segment_length = value;
        self
     }
     
     pub fn curveSmoothMaxIterations(mut self, value: usize) -> Self {
-       self.curve_interpolator_config.smooth_max_iterations = value;
+       self.curve_intrapolator_config.smooth_max_iterations = value;
        self
     }
     
     pub fn curveCornerThreshold(mut self, value: f64) -> Self {
-       self.curve_interpolator_config.corner_threshold = value;
+       self.curve_intrapolator_config.corner_threshold = value;
        self
     }
     
     pub fn curveTailTangentNumPoints(mut self, value: usize) -> Self {
-       self.curve_interpolator_config.tail_tangent_num_points = value;
+       self.curve_intrapolator_config.tail_tangent_num_points = value;
        self
     }
     
     pub fn curveTailWeightMultiplier(mut self, value: f64) -> Self {
-       self.curve_interpolator_config.tail_weight_multiplier = value;
+       self.curve_intrapolator_config.tail_weight_multiplier = value;
        self
     }
     
     pub fn curveControlPointsRetractRatio(mut self, value: f64) -> Self {
-       self.curve_interpolator_config.control_points_retract_ratio = value;
+       self.curve_intrapolator_config.control_points_retract_ratio = value;
        self
     }
 }
 
 // API
-impl CompletorConfig {
+impl ShapeCompletorAPIConfig {
     pub fn get_canvas_id(&self) -> &str {
         &self.canvas_id
     }
 }
 
 // Helper functions
-impl CompletorConfig {
+impl ShapeCompletorAPIConfig {
 
 }
