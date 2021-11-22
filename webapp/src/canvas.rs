@@ -1,6 +1,6 @@
+use visioncortex::ColorImage;
 use wasm_bindgen::JsCast;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement};
-use visioncortex::ColorImage;
 
 use super::common::document;
 
@@ -24,12 +24,7 @@ impl Canvas {
             .dyn_into::<CanvasRenderingContext2d>()
             .unwrap();
 
-        Some(
-            Canvas {
-                html_canvas,
-                cctx,
-            }
-        )
+        Some(Canvas { html_canvas, cctx })
     }
 
     pub fn get_rendering_context_2d(&self) -> &CanvasRenderingContext2d {
@@ -60,7 +55,13 @@ impl Canvas {
         image.data().to_vec()
     }
 
-    pub fn get_image_data_as_color_image(&self, x: u32, y: u32, width: u32, height: u32) -> ColorImage {
+    pub fn get_image_data_as_color_image(
+        &self,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+    ) -> ColorImage {
         ColorImage {
             pixels: self.get_image_data(x, y, width, height),
             width: width as usize,
@@ -70,6 +71,7 @@ impl Canvas {
 
     pub fn clear(&self) {
         self.cctx.set_fill_style(&"#FFFFFF".into());
-        self.cctx.fill_rect(0.0, 0.0, self.width() as f64, self.height() as f64);
+        self.cctx
+            .fill_rect(0.0, 0.0, self.width() as f64, self.height() as f64);
     }
 }

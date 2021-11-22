@@ -1,6 +1,9 @@
 use std::f64::consts::PI;
 
-use flo_curves::{Coord2, Coordinate, bezier::{Curve, curve_intersects_curve_clip}};
+use flo_curves::{
+    bezier::{curve_intersects_curve_clip, Curve},
+    Coord2, Coordinate,
+};
 use visioncortex::{CompoundPath, CompoundPathElement, PathF64, PointF64, Spline};
 
 // Geometry helper functions
@@ -10,11 +13,11 @@ fn f64_approximately(a: f64, b: f64) -> bool {
 }
 
 /// ratio : returned point
-/// 
+///
 /// 0 : 'from'
-/// 
+///
 /// 0.5 : midpoint
-/// 
+///
 /// 1 : 'to'
 pub fn calculate_in_between_point(from: PointF64, to: PointF64, ratio: f64) -> PointF64 {
     let dir = to - from;
@@ -34,14 +37,19 @@ pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
 
 pub enum LineIntersectionResult {
     Intersect(PointF64), // The segments can be extended in the positive directions to intersect at this point
-    Parallel, // No intersection at all
-    Coincidence, // Infinite intersections (extended or not)
-    None, // No intersection in the positive directions
+    Parallel,            // No intersection at all
+    Coincidence,         // Infinite intersections (extended or not)
+    None,                // No intersection in the positive directions
 }
 
 // Given directed lines p1p2 and p3p4, returns their intersection result.
-pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: PointF64) -> LineIntersectionResult {
-    let extract_coords = |p: &PointF64| {(p.x, p.y)};
+pub fn calculate_intersection(
+    p1: PointF64,
+    p2: PointF64,
+    p3: PointF64,
+    p4: PointF64,
+) -> LineIntersectionResult {
+    let extract_coords = |p: &PointF64| (p.x, p.y);
     let (x1, y1) = extract_coords(&p1);
     let (x2, y2) = extract_coords(&p2);
     let (x3, y3) = extract_coords(&p3);
@@ -67,7 +75,7 @@ pub fn calculate_intersection(p1: PointF64, p2: PointF64, p3: PointF64, p4: Poin
         LineIntersectionResult::Intersect(PointF64::new(x1 + u_a * (x2 - x1), y1 + u_a * (y2 - y1)))
     } else {
         LineIntersectionResult::None
-    }    
+    }
 }
 
 /// Find the inclined angle of a point in (-pi, pi].
@@ -102,14 +110,14 @@ pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
     if path.is_empty() {
         return vec![];
     }
-    
+
     let path = path.to_open();
     let len = path.len();
 
     let mut corners: Vec<bool> = vec![false; len];
-    for i in 1..(len-1) {
-        let prev = i-1;
-        let next = i+1;
+    for i in 1..(len - 1) {
+        let prev = i - 1;
+        let next = i + 1;
 
         let v1 = path[i] - path[prev];
         let v2 = path[next] - path[i];
@@ -122,14 +130,19 @@ pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
             corners[i] = true;
         }
     }
-    
+
     corners
 }
 
 /// Finds mid-points between (p_i and p_j) and (p_1 and p_2), where p_i and p_j should be between p_1 and p_2,
 /// then returns the new point constructed by the 4-point scheme
 pub fn find_new_point_from_4_point_scheme(
-    p_i: &PointF64, p_j: &PointF64, p_1: &PointF64, p_2: &PointF64, outset_ratio: f64) -> PointF64 {
+    p_i: &PointF64,
+    p_j: &PointF64,
+    p_1: &PointF64,
+    p_2: &PointF64,
+    outset_ratio: f64,
+) -> PointF64 {
     let mid_out = calculate_midpoint(*p_i, *p_j);
     let mid_in = calculate_midpoint(*p_1, *p_2);
 
@@ -160,25 +173,37 @@ pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
     });
 
     let single_spline_to_curve = |spline: &Spline| {
-        let coords: Vec<Coord2> = spline.points.iter().map(|p| Coord2::from_components(&[p.x, p.y])).collect();
+        let coords: Vec<Coord2> = spline
+            .points
+            .iter()
+            .map(|p| Coord2::from_components(&[p.x, p.y]))
+            .collect();
         Curve {
             start_point: coords[0],
             end_point: coords[3],
-            control_points: (coords[1], coords[2])
+            control_points: (coords[1], coords[2]),
         }
     };
 
     // Convert to a type that is easier to work with
-    let curves_vec: Vec<Vec<Curve<Coord2> > > = compound_curves.iter()
-                                         .map(|compound_curve| {
-                                            compound_curve.iter().filter_map(|curve| {
-                                                if let CompoundPathElement::Spline(curve) = curve { Some(single_spline_to_curve(curve)) } else { None }
-                                            }).collect()
-                                         })
-                                         .collect();
+    let curves_vec: Vec<Vec<Curve<Coord2>>> = compound_curves
+        .iter()
+        .map(|compound_curve| {
+            compound_curve
+                .iter()
+                .filter_map(|curve| {
+                    if let CompoundPathElement::Spline(curve) = curve {
+                        Some(single_spline_to_curve(curve))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .collect();
 
     let two_curves_intersect = |curve1: &Curve<Coord2>, curve2: &Curve<Coord2>| {
-        let base_length = |curve: &Curve<Coord2>| { curve.start_point.distance_to(&curve.end_point) };
+        let base_length = |curve: &Curve<Coord2>| curve.start_point.distance_to(&curve.end_point);
         let accuracy = (base_length(curve1) + base_length(curve2)) * 0.25;
 
         !curve_intersects_curve_clip(curve1, curve2, accuracy).is_empty()
@@ -188,10 +213,10 @@ pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
     // If any pair intersects, return true, else false
     curves_vec.iter().enumerate().any(|(i, curves_i)| {
         curves_i.iter().any(|curve_i| {
-            curves_vec.iter().skip(i+1).any(|curves_j| {
-                curves_j.iter().any(|curve_j| {
-                    two_curves_intersect(curve_i, curve_j)
-                })
+            curves_vec.iter().skip(i + 1).any(|curves_j| {
+                curves_j
+                    .iter()
+                    .any(|curve_j| two_curves_intersect(curve_i, curve_j))
             })
         })
     })

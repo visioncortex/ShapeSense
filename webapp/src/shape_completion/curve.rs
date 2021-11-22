@@ -3,7 +3,12 @@ use wasm_bindgen::prelude::*;
 
 use crate::{shape_completion::find_new_point_from_4_point_scheme, util::console_log_util};
 
-use super::{LineIntersectionResult, calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, draw::{DisplaySelector, DrawUtil}, find_corners};
+use super::{
+    calculate_in_between_point, calculate_intersection, calculate_midpoint,
+    calculate_unit_normal_of_line,
+    draw::{DisplaySelector, DrawUtil},
+    find_corners, Debugger, LineIntersectionResult,
+};
 
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
@@ -21,7 +26,7 @@ pub struct CurveIntrapolatorConfig {
 
 impl Default for CurveIntrapolatorConfig {
     fn default() -> Self {
-        Self { 
+        Self {
             outset_ratio: 8.0,
             min_segment_length: 4.0,
             smooth_max_iterations: 2,
@@ -33,22 +38,24 @@ impl Default for CurveIntrapolatorConfig {
     }
 }
 
-
-
 /// intrapolate in-between curve given 2 curves
-pub struct CurveIntrapolator {
+pub struct CurveIntrapolator<'a> {
     pub config: CurveIntrapolatorConfig,
     pub hole_rect: BoundingRect,
-    pub draw_util: DrawUtil,
+    pub debugger: &'a dyn Debugger,
 }
 
 // API
-impl CurveIntrapolator {
-    pub fn new(config: CurveIntrapolatorConfig, hole_rect: BoundingRect, draw_util: DrawUtil) -> Self {
+impl<'a> CurveIntrapolator<'a> {
+    pub fn new(
+        config: CurveIntrapolatorConfig,
+        hole_rect: BoundingRect,
+        debugger: &'a dyn Debugger,
+    ) -> Self {
         Self {
             config,
             hole_rect,
-            draw_util,
+            debugger,
         }
     }
 
@@ -56,7 +63,14 @@ impl CurveIntrapolator {
     /// The endpoints of the intrapolated curve are defined by 'at_tail_curve1' and 'at_tail_curve2'.
     /// If 'at_tail_curve1' is true, the last point of 'curve1' is used as one of the endpoints of the curve, otherwise the first
     /// point (head) of 'curve1' is used. The same goes for 'at_tail_curve2' and 'curve2'.
-    pub fn intrapolate_curve_between_curves(&self, mut curve1: PathF64, mut curve2: PathF64, at_tail_curve1: bool, at_tail_curve2: bool, correct_tail_tangents: bool) -> Option<CompoundPath> {
+    pub fn intrapolate_curve_between_curves(
+        &self,
+        mut curve1: PathF64,
+        mut curve2: PathF64,
+        at_tail_curve1: bool,
+        at_tail_curve2: bool,
+        correct_tail_tangents: bool,
+    ) -> Option<CompoundPath> {
         let color1 = Color::get_palette_color(1);
         let color2 = Color::get_palette_color(3);
 
@@ -69,7 +83,7 @@ impl CurveIntrapolator {
         }
         let (curve1, curve2) = (curve1, curve2);
 
-        let (endpoint1, endpoint2) = (curve1[curve1.len()-1], curve2[curve2.len()-1]);
+        let (endpoint1, endpoint2) = (curve1[curve1.len() - 1], curve2[curve2.len() - 1]);
         let base_length = endpoint1.distance_to(endpoint2);
 
         //# Curve smoothing
@@ -78,56 +92,98 @@ impl CurveIntrapolator {
         let max_iterations = self.config.smooth_max_iterations;
         let corner_threshold = self.config.corner_threshold;
 
-        let (smooth_curve1, corners1) = Self::smooth_open_curve_iterative(curve1, outset_ratio, min_segment_length, max_iterations, corner_threshold);
-        let (smooth_curve2, corners2) = Self::smooth_open_curve_iterative(curve2, outset_ratio, min_segment_length, max_iterations, corner_threshold);
+        let (smooth_curve1, corners1) = Self::smooth_open_curve_iterative(
+            curve1,
+            outset_ratio,
+            min_segment_length,
+            max_iterations,
+            corner_threshold,
+        );
+        let (smooth_curve2, corners2) = Self::smooth_open_curve_iterative(
+            curve2,
+            outset_ratio,
+            min_segment_length,
+            max_iterations,
+            corner_threshold,
+        );
 
-        if self.draw_util.display_selector == DisplaySelector::Smoothed {
-            self.draw_util.draw_path_f64(&color1, &smooth_curve1);
-            self.draw_util.draw_path_f64(&color2, &smooth_curve2);
+        if self.debugger.should_draw_smoothed() {
+            self.debugger.draw_path_f64(&color1, &smooth_curve1);
+            self.debugger.draw_path_f64(&color2, &smooth_curve2);
         }
 
         //# Tail tangent approximation
         let tail_tangent_n_points = self.config.tail_tangent_num_points;
         let tail_weight_multiplier = self.config.tail_weight_multiplier;
         let (smooth_curve1_len, smooth_curve2_len) = (smooth_curve1.len(), smooth_curve2.len());
-        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve1, &corners1, std::cmp::min(tail_tangent_n_points, smooth_curve1_len), base_length, tail_weight_multiplier);
-        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(smooth_curve2, &corners2, std::cmp::min(tail_tangent_n_points, smooth_curve2_len), base_length, tail_weight_multiplier);
+        let tail_tangent1 = Self::calculate_weighted_average_tangent_at_tail(
+            smooth_curve1,
+            &corners1,
+            std::cmp::min(tail_tangent_n_points, smooth_curve1_len),
+            base_length,
+            tail_weight_multiplier,
+        );
+        let tail_tangent2 = Self::calculate_weighted_average_tangent_at_tail(
+            smooth_curve2,
+            &corners2,
+            std::cmp::min(tail_tangent_n_points, smooth_curve2_len),
+            base_length,
+            tail_weight_multiplier,
+        );
 
         let (tail_tangent1, tail_tangent2) = if correct_tail_tangents {
-                                                Self::correct_tail_tangents(endpoint1, tail_tangent1, endpoint2, tail_tangent2)
-                                             } else {
-                                                (tail_tangent1, tail_tangent2)
-                                             };
+            Self::correct_tail_tangents(endpoint1, tail_tangent1, endpoint2, tail_tangent2)
+        } else {
+            (tail_tangent1, tail_tangent2)
+        };
 
-        if self.draw_util.display_tangents {
-            let tangent_visual_length = (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
+        if self.debugger.should_draw_tail_tangents() {
+            let tangent_visual_length =
+                (self.hole_rect.width() + self.hole_rect.height()) as f64 / 3.5;
             let to_point1 = endpoint1 + tail_tangent1.get_normalized() * tangent_visual_length;
             let to_point2 = endpoint2 + tail_tangent2.get_normalized() * tangent_visual_length;
-            self.draw_util.draw_line_f64(&color1, endpoint1, to_point1);
-            self.draw_util.draw_line_f64(&color2, endpoint2, to_point2);
+            self.debugger.draw_line_f64(&color1, endpoint1, to_point1);
+            self.debugger.draw_line_f64(&color2, endpoint2, to_point2);
         }
-        
+
         //# Curve intrapolation
-        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2, self.config.control_points_retract_ratio)
+        self.calculate_whole_curve(
+            endpoint1,
+            tail_tangent1,
+            endpoint2,
+            tail_tangent2,
+            self.config.control_points_retract_ratio,
+        )
     }
 }
 
 // Helper functions
-impl CurveIntrapolator {
+impl<'a> CurveIntrapolator<'a> {
     /// Apply the 4-point scheme subdivision on 'path' in a convolutional manner iteratively, preserving corners.
     /// The corners of the smoothed path are returned as a bool mask.
     /// Segments (at any point during iteration) shorter than 'min_segment_length' are not further subdivided.
     /// If no subdivision is performed, the iterative process is terminated early.
     /// 'path' is returned as-is if path.len() < 4
-    fn smooth_open_curve_iterative(mut path: PathF64, outset_ratio: f64, min_segment_length: f64, max_iterations: usize, corner_threshold: f64) -> (PathF64, Vec<bool>) {
+    fn smooth_open_curve_iterative(
+        mut path: PathF64,
+        outset_ratio: f64,
+        min_segment_length: f64,
+        max_iterations: usize,
+        corner_threshold: f64,
+    ) -> (PathF64, Vec<bool>) {
         let mut corners = find_corners(&path, corner_threshold);
 
-        if path.len() < 4  {
+        if path.len() < 4 {
             return (path, corners);
         }
-        
+
         for _ in 0..max_iterations {
-            let can_terminate_early = Self::smooth_open_curve_step(&mut path, &mut corners, outset_ratio, min_segment_length);
+            let can_terminate_early = Self::smooth_open_curve_step(
+                &mut path,
+                &mut corners,
+                outset_ratio,
+                min_segment_length,
+            );
 
             // Early termination
             if can_terminate_early {
@@ -139,20 +195,25 @@ impl CurveIntrapolator {
     }
 
     /// Return true if no subdivision is done in this step.
-    fn smooth_open_curve_step(path: &mut PathF64, corners: &mut Vec<bool>, outset_ratio: f64, min_segment_length: f64) -> bool {
+    fn smooth_open_curve_step(
+        path: &mut PathF64,
+        corners: &mut Vec<bool>,
+        outset_ratio: f64,
+        min_segment_length: f64,
+    ) -> bool {
         let mut new_points = vec![path[0]];
         let mut new_corners = vec![corners[0]];
 
         // Duplicate the last point to make sure all segments except the first are subdivided
-        path.add(path[path.len()-1]);
+        path.add(path[path.len() - 1]);
 
         // Apply 4-point scheme on 'path' in a convolutional manner
         for (i, points) in path.path.windows(4).enumerate() {
             new_points.push(points[1]);
-            new_corners.push(corners[i+1]);
+            new_corners.push(corners[i + 1]);
 
             // Do not smooth out corners
-            if corners[i+1] || corners[i+2] {
+            if corners[i + 1] || corners[i + 2] {
                 continue;
             }
 
@@ -160,18 +221,24 @@ impl CurveIntrapolator {
             let checked_segment_length = points[1].distance_to(points[2]);
             if checked_segment_length >= min_segment_length {
                 new_points.push(find_new_point_from_4_point_scheme(
-                    &points[1], &points[2], &points[0], &points[3], outset_ratio));
+                    &points[1],
+                    &points[2],
+                    &points[0],
+                    &points[3],
+                    outset_ratio,
+                ));
                 new_corners.push(false); // New point must be a non-corner during subdivision
-            }    
+            }
         }
 
         // Push the original last point
         new_points.extend(path.iter().rev().take(1));
-        new_corners.push(corners[corners.len()-1]);
+        new_corners.push(corners[corners.len() - 1]);
 
         assert_eq!(new_points.len(), new_corners.len());
 
-        if new_points.len() == path.len() { // no additional points after this step
+        if new_points.len() == path.len() {
+            // no additional points after this step
             true
         } else {
             *path = PathF64::from_points(new_points);
@@ -179,14 +246,20 @@ impl CurveIntrapolator {
             false
         }
     }
-    
+
     /// Calculate the weighted average tangent vector at the tail of 'path'.
     /// Either the last 'n' points, the most number of points at the tail such that the sum of segment
     /// lengths is at most base_length, or the last points until a corner is seen, whichever is the smallest,
     /// are taken into account.
     /// The weights are stronger towards the tail, this is specified by 'tail_weight_multiplier'.
     /// The behavior is undefined unless path is open and 1 < n <= path.len().
-    fn calculate_weighted_average_tangent_at_tail(path: PathF64, corners: &[bool], n: usize, base_length: f64, tail_weight_multiplier: f64) -> PointF64 {
+    fn calculate_weighted_average_tangent_at_tail(
+        path: PathF64,
+        corners: &[bool],
+        n: usize,
+        base_length: f64,
+        tail_weight_multiplier: f64,
+    ) -> PointF64 {
         let len = path.len();
         assert!(1 < n);
         assert!(n <= len);
@@ -216,20 +289,26 @@ impl CurveIntrapolator {
     }
 
     /// Make sure the two tangents do not bend outwards
-    fn correct_tail_tangents(point1: PointF64, mut tangent1: PointF64, point2: PointF64, mut tangent2: PointF64) -> (PointF64, PointF64) {
-        let correct_tangent = |tangent: &mut PointF64, root_point: PointF64, segment_point: PointF64| {
-            let mut unit_normal = calculate_unit_normal_of_line(root_point, segment_point); // RHS normal
-            let root_to_segment = segment_point - root_point;
-            if tangent.dot(root_to_segment).is_sign_negative() {
-                // 'tangent' is bent outwards
-                if tangent.dot(unit_normal).is_sign_negative() {
-                    // Use the normal on the other side
-                    unit_normal = -unit_normal;
+    fn correct_tail_tangents(
+        point1: PointF64,
+        mut tangent1: PointF64,
+        point2: PointF64,
+        mut tangent2: PointF64,
+    ) -> (PointF64, PointF64) {
+        let correct_tangent =
+            |tangent: &mut PointF64, root_point: PointF64, segment_point: PointF64| {
+                let mut unit_normal = calculate_unit_normal_of_line(root_point, segment_point); // RHS normal
+                let root_to_segment = segment_point - root_point;
+                if tangent.dot(root_to_segment).is_sign_negative() {
+                    // 'tangent' is bent outwards
+                    if tangent.dot(unit_normal).is_sign_negative() {
+                        // Use the normal on the other side
+                        unit_normal = -unit_normal;
+                    }
+                    *tangent = unit_normal * root_to_segment.norm();
                 }
-                *tangent = unit_normal * root_to_segment.norm();
-            }
-            // Otherwise, 'tangent' is correct already
-        };
+                // Otherwise, 'tangent' is correct already
+            };
 
         correct_tangent(&mut tangent1, point1, point2);
         correct_tangent(&mut tangent2, point2, point1);
@@ -237,8 +316,20 @@ impl CurveIntrapolator {
         (tangent1, tangent2)
     }
 
-    fn calculate_whole_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, retract_ratio: f64) -> Option<CompoundPath> {
-        let intersection_result = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+    fn calculate_whole_curve(
+        &self,
+        from_point: PointF64,
+        from_tangent: PointF64,
+        to_point: PointF64,
+        to_tangent: PointF64,
+        retract_ratio: f64,
+    ) -> Option<CompoundPath> {
+        let intersection_result = calculate_intersection(
+            from_point,
+            from_point + from_tangent,
+            to_point,
+            to_point + to_tangent,
+        );
         let mut compound_path = CompoundPath::new();
 
         let cut_curve_into_two_and_insert = |compound_path: &mut CompoundPath| {
@@ -247,11 +338,29 @@ impl CurveIntrapolator {
             let mid_point = calculate_midpoint(from_point, to_point);
             let normal = calculate_unit_normal_of_line(from_point, to_point);
             // Determine the normal to use (+/-) based on the side of the tangents
-            let from_side_normal = if from_tangent.dot(normal) > 0.0 {normal} else {-normal};
+            let from_side_normal = if from_tangent.dot(normal) > 0.0 {
+                normal
+            } else {
+                -normal
+            };
             let to_side_normal = -from_side_normal;
             // Calculate the two parts of the curve, recalculating the intersections
-            let from_side_curve = self.calculate_part_curve(from_point, from_tangent, mid_point, from_side_normal, LineIntersectionResult::None, retract_ratio)?;
-            let to_side_curve = self.calculate_part_curve(mid_point, to_side_normal, to_point, to_tangent, LineIntersectionResult::None, retract_ratio)?;
+            let from_side_curve = self.calculate_part_curve(
+                from_point,
+                from_tangent,
+                mid_point,
+                from_side_normal,
+                LineIntersectionResult::None,
+                retract_ratio,
+            )?;
+            let to_side_curve = self.calculate_part_curve(
+                mid_point,
+                to_side_normal,
+                to_point,
+                to_tangent,
+                LineIntersectionResult::None,
+                retract_ratio,
+            )?;
 
             compound_path.add_spline(from_side_curve);
             compound_path.add_spline(to_side_curve);
@@ -262,24 +371,48 @@ impl CurveIntrapolator {
         match intersection_result {
             LineIntersectionResult::Intersect(_) => {
                 // Only 1 big part
-                let spline = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, intersection_result, retract_ratio)?;
+                let spline = self.calculate_part_curve(
+                    from_point,
+                    from_tangent,
+                    to_point,
+                    to_tangent,
+                    intersection_result,
+                    retract_ratio,
+                )?;
                 compound_path.add_spline(spline);
-            },
+            }
             LineIntersectionResult::Parallel => {
-                if from_tangent.dot(to_tangent).is_sign_positive() { // Same direction
+                if from_tangent.dot(to_tangent).is_sign_positive() {
+                    // Same direction
                     // Only 1 big part
-                    let spline = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, LineIntersectionResult::Parallel, retract_ratio)?;
+                    let spline = self.calculate_part_curve(
+                        from_point,
+                        from_tangent,
+                        to_point,
+                        to_tangent,
+                        LineIntersectionResult::Parallel,
+                        retract_ratio,
+                    )?;
                     compound_path.add_spline(spline);
                 } else {
                     cut_curve_into_two_and_insert(&mut compound_path)?;
                 }
-            },
+            }
             LineIntersectionResult::Coincidence => {
                 // Just a straight line
-                let line = self.calculate_part_curve(from_point, from_tangent, to_point, to_tangent, LineIntersectionResult::Intersect(calculate_midpoint(from_point, to_point)), retract_ratio)?;
+                let line = self.calculate_part_curve(
+                    from_point,
+                    from_tangent,
+                    to_point,
+                    to_tangent,
+                    LineIntersectionResult::Intersect(calculate_midpoint(from_point, to_point)),
+                    retract_ratio,
+                )?;
                 compound_path.add_spline(line);
-            },
-            LineIntersectionResult::None => { cut_curve_into_two_and_insert(&mut compound_path)?; },
+            }
+            LineIntersectionResult::None => {
+                cut_curve_into_two_and_insert(&mut compound_path)?;
+            }
         };
 
         Some(compound_path)
@@ -287,55 +420,84 @@ impl CurveIntrapolator {
 
     /// Calculate the cubic bezier curve from 'from_point' to 'to_point' with the provided tangents.
     /// 'intersection_result' is only to avoid unnecessary recalculation.
-    fn calculate_part_curve(&self, from_point: PointF64, from_tangent: PointF64, to_point: PointF64, to_tangent: PointF64, whole_intersection_result: LineIntersectionResult, retract_ratio: f64) -> Option<Spline> {
+    fn calculate_part_curve(
+        &self,
+        from_point: PointF64,
+        from_tangent: PointF64,
+        to_point: PointF64,
+        to_tangent: PointF64,
+        whole_intersection_result: LineIntersectionResult,
+        retract_ratio: f64,
+    ) -> Option<Spline> {
         let retract_control_point = |from_point: PointF64, mut control_point: PointF64| {
             // Push the control point inwards
             let mut i: usize = 1000; // Limit the number of iterations
-            while !self.hole_rect.have_point_on_boundary_or_inside(control_point.to_point_i32(), 1) && i > 0 {
-                control_point = calculate_in_between_point(from_point, control_point, retract_ratio);
+            while !self
+                .hole_rect
+                .have_point_on_boundary_or_inside(control_point.to_point_i32(), 1)
+                && i > 0
+            {
+                control_point =
+                    calculate_in_between_point(from_point, control_point, retract_ratio);
                 i -= 1;
             }
             control_point
         };
-        
+
         let calculate_control_points = |intersection: PointF64| {
             let scaled_base_length = from_point.distance_to(to_point) * 2.0;
 
             let length_from_and_intersection = from_point.distance_to(intersection);
             let length_to_and_intersection = to_point.distance_to(intersection);
 
-            let evaluate_control_point = |point: PointF64, tangent:PointF64, length_with_intersection: f64| {
-                let control_point = if scaled_base_length > length_with_intersection * 0.5 {
-                    calculate_midpoint(point, intersection)
-                } else {
-                    point + tangent * scaled_base_length
-                };
+            let evaluate_control_point =
+                |point: PointF64, tangent: PointF64, length_with_intersection: f64| {
+                    let control_point = if scaled_base_length > length_with_intersection * 0.5 {
+                        calculate_midpoint(point, intersection)
+                    } else {
+                        point + tangent * scaled_base_length
+                    };
 
-                retract_control_point(point, control_point)
-            };
-            let control_point1 = evaluate_control_point(from_point, from_tangent, length_from_and_intersection);
-            let control_point2 = evaluate_control_point(to_point, to_tangent, length_to_and_intersection);
+                    retract_control_point(point, control_point)
+                };
+            let control_point1 =
+                evaluate_control_point(from_point, from_tangent, length_from_and_intersection);
+            let control_point2 =
+                evaluate_control_point(to_point, to_tangent, length_to_and_intersection);
 
             (control_point1, control_point2)
         };
-        
+
         let (control_point1, control_point2) = match whole_intersection_result {
-            LineIntersectionResult::Intersect(intersection) => calculate_control_points(intersection),
+            LineIntersectionResult::Intersect(intersection) => {
+                calculate_control_points(intersection)
+            }
             LineIntersectionResult::Parallel => (
                 retract_control_point(from_point, from_point + from_tangent),
-                retract_control_point(to_point, to_point + to_tangent)
+                retract_control_point(to_point, to_point + to_tangent),
             ),
             LineIntersectionResult::Coincidence => panic!("Part curves do not handle coincidence."),
             LineIntersectionResult::None => {
                 // Whole curve has been divided -> recalculate intersection
-                let intersection_result = calculate_intersection(from_point, from_point + from_tangent, to_point, to_point + to_tangent);
+                let intersection_result = calculate_intersection(
+                    from_point,
+                    from_point + from_tangent,
+                    to_point,
+                    to_point + to_tangent,
+                );
                 match intersection_result {
-                    LineIntersectionResult::Intersect(intersection) => calculate_control_points(intersection),
-                    LineIntersectionResult::Parallel => (from_point + from_tangent, to_point + to_tangent),
-                    LineIntersectionResult::Coincidence => panic!("Part curves do not handle coincidence."),
+                    LineIntersectionResult::Intersect(intersection) => {
+                        calculate_control_points(intersection)
+                    }
+                    LineIntersectionResult::Parallel => {
+                        (from_point + from_tangent, to_point + to_tangent)
+                    }
+                    LineIntersectionResult::Coincidence => {
+                        panic!("Part curves do not handle coincidence.")
+                    }
                     LineIntersectionResult::None => return None,
                 }
-            },
+            }
         };
         let mut spline = Spline::new(from_point);
         spline.add(control_point1, control_point2, to_point);

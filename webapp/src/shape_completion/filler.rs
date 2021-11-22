@@ -1,6 +1,10 @@
-use std::{collections::HashSet, convert::TryInto, ops::{Index, IndexMut}};
+use std::{
+    collections::HashSet,
+    convert::TryInto,
+    ops::{Index, IndexMut},
+};
 
-use flo_curves::{BezierCurve, Coord2, Coordinate2D, bezier::Curve};
+use flo_curves::{bezier::Curve, BezierCurve, Coord2, Coordinate2D};
 use visioncortex::{BinaryImage, BoundingRect, CompoundPath, PointF64, PointI32, PointUsize};
 
 use crate::util::{console_log_debug_util, console_log_util};
@@ -15,7 +19,7 @@ pub enum FilledHoleElement {
 pub struct FilledHoleMatrix {
     pub width: usize,
     pub height: usize,
-    pub elems: Vec<FilledHoleElement>
+    pub elems: Vec<FilledHoleElement>,
 }
 
 impl FilledHoleMatrix {
@@ -28,20 +32,20 @@ impl FilledHoleMatrix {
     }
 
     pub fn new_without_column(&self, col: usize) -> Self {
-        let mut matrix = Self::new(self.width-1, self.height);
+        let mut matrix = Self::new(self.width - 1, self.height);
         for i in 0..matrix.height {
             for j in 0..matrix.width {
-                matrix[i][j] = self[i][if j < col { j } else { j+1 }];
+                matrix[i][j] = self[i][if j < col { j } else { j + 1 }];
             }
         }
         matrix
     }
 
     pub fn new_without_row(&self, row: usize) -> Self {
-        let mut matrix = Self::new(self.width, self.height-1);
+        let mut matrix = Self::new(self.width, self.height - 1);
         for i in 0..matrix.height {
             for j in 0..matrix.width {
-                matrix[i][j] = self[if i < row { i } else { i+1 }][j];
+                matrix[i][j] = self[if i < row { i } else { i + 1 }][j];
             }
         }
         matrix
@@ -52,13 +56,13 @@ impl Index<usize> for FilledHoleMatrix {
     type Output = [FilledHoleElement]; // Output a row for further indexing
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.elems[(index * self.width) .. ((index+1) * self.width)]
+        &self.elems[(index * self.width)..((index + 1) * self.width)]
     }
 }
 
 impl IndexMut<usize> for FilledHoleMatrix {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.elems[(index * self.width) .. ((index+1) * self.width)]
+        &mut self.elems[(index * self.width)..((index + 1) * self.width)]
     }
 }
 
@@ -85,10 +89,10 @@ impl HoleFiller {
     /// The behavior is undefined unless the size of 'image' is at least the size
     /// of 'hole_rect'.
     pub fn fill(
-       image: &BinaryImage,
-       hole_rect: BoundingRect,
-       intrapolated_curves: Vec<CompoundPath>,
-       endpoints: Vec<PointI32>
+        image: &BinaryImage,
+        hole_rect: BoundingRect,
+        intrapolated_curves: Vec<CompoundPath>,
+        endpoints: Vec<PointI32>,
     ) -> Result<FilledHoleMatrix, String> {
         let matrix = FilledHoleMatrix::new(hole_rect.width() as usize, hole_rect.height() as usize);
         let origin = PointI32::new(hole_rect.left, hole_rect.top);
@@ -96,50 +100,54 @@ impl HoleFiller {
         let matrix = Self::rasterize_intrapolated_curves(matrix, intrapolated_curves, origin);
 
         Self::fill_holes(matrix, image, hole_rect, origin, endpoints)
-   }
+    }
 }
 
 // Helper functions
 impl HoleFiller {
-    fn rasterize_intrapolated_curves(mut matrix: FilledHoleMatrix, curves: Vec<CompoundPath>, origin: PointI32) -> FilledHoleMatrix {
+    fn rasterize_intrapolated_curves(
+        mut matrix: FilledHoleMatrix,
+        curves: Vec<CompoundPath>,
+        origin: PointI32,
+    ) -> FilledHoleMatrix {
         let offset = -origin;
         curves.into_iter().for_each(|mut compound_path| {
-            compound_path.iter_mut().for_each(|path_elem| {
-                match path_elem {
+            compound_path
+                .iter_mut()
+                .for_each(|path_elem| match path_elem {
                     visioncortex::CompoundPathElement::PathI32(path) => {
                         path.offset(&offset);
                         path.iter().for_each(|point| {
                             let point = PointUsize::new(point.x as usize, point.y as usize);
                             matrix[point] = FilledHoleElement::Structure;
                         })
-                    },
+                    }
                     visioncortex::CompoundPathElement::PathF64(path) => {
                         path.offset(&offset.to_point_f64());
                         path.iter().for_each(|point| {
                             let point = PointUsize::new(point.x as usize, point.y as usize);
                             matrix[point] = FilledHoleElement::Structure;
                         })
-                    },
+                    }
                     visioncortex::CompoundPathElement::Spline(spline) => {
                         spline.offset(&offset.to_point_f64());
                         spline.get_control_points().into_iter().for_each(|points| {
                             Self::rasterize_bezier_curve(
                                 &mut matrix,
-                                points.try_into().expect("Control points must have 4 elements")
+                                points
+                                    .try_into()
+                                    .expect("Control points must have 4 elements"),
                             );
                         });
-                    },
-                }
-            });
+                    }
+                });
         });
 
         matrix
     }
 
     fn rasterize_bezier_curve(matrix: &mut FilledHoleMatrix, control_points: [PointF64; 4]) {
-        let points: Vec<Coord2> = control_points.iter().map(|p| {
-            Coord2(p.x, p.y)
-        }).collect();
+        let points: Vec<Coord2> = control_points.iter().map(|p| Coord2(p.x, p.y)).collect();
 
         let curve = Curve {
             start_point: points[0],
@@ -152,19 +160,25 @@ impl HoleFiller {
             let t = i as f64 / quantization_levels as f64;
             let p = curve.point_at_pos(t);
             let clipped_p = PointUsize::new(
-                std::cmp::min(p.x() as usize, matrix.width-1),
-                std::cmp::min(p.y() as usize, matrix.height-1),
+                std::cmp::min(p.x() as usize, matrix.width - 1),
+                std::cmp::min(p.y() as usize, matrix.height - 1),
             );
             matrix[clipped_p] = FilledHoleElement::Structure;
         }
     }
 
     /// The behavior is undefined unless 'offset' is the top-left corner of 'hole_rect' (exactly on its boundary).
-    fn fill_holes(mut matrix: FilledHoleMatrix, image: &BinaryImage, hole_rect: BoundingRect, offset: PointI32, endpoints: Vec<PointI32>) -> Result<FilledHoleMatrix, String> {
+    fn fill_holes(
+        mut matrix: FilledHoleMatrix,
+        image: &BinaryImage,
+        hole_rect: BoundingRect,
+        offset: PointI32,
+        endpoints: Vec<PointI32>,
+    ) -> Result<FilledHoleMatrix, String> {
         let max_depth = std::usize::MAX;
 
         let endpoints = Self::adjust_endpoints(&hole_rect, endpoints);
-        
+
         let bounding_points = hole_rect.get_boundary_points_from(endpoints[0], true);
         let num_points = bounding_points.len();
         let mut current_point = 0;
@@ -179,8 +193,8 @@ impl HoleFiller {
             (from + (cyclic_dist >> 1)) % num_points
         };
 
-        let endpoints_set = endpoints.iter().copied().collect::<HashSet<PointI32> >();
-        let is_endpoint = |p| { endpoints_set.contains(&p) };
+        let endpoints_set = endpoints.iter().copied().collect::<HashSet<PointI32>>();
+        let is_endpoint = |p| endpoints_set.contains(&p);
 
         let eval_outside_point = |point_idx| {
             let point_val: PointI32 = bounding_points[point_idx];
@@ -203,7 +217,8 @@ impl HoleFiller {
         // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
         // Repeat this until the first endpoint is seen again.
         let mut just_filled = false;
-        loop { // Not back to the first endpoint yet
+        loop {
+            // Not back to the first endpoint yet
             let prev_endpoint = current_point;
             let mut total_pixels = 0_usize;
             let mut filled_pixels = 0_usize;
@@ -261,30 +276,39 @@ impl HoleFiller {
                         // Should be adjusted to either top or bottom side
                         PointI32::new(
                             endpoint.x,
-                            if (hole_rect.top - endpoint.y).abs() < (hole_rect.bottom - endpoint.y).abs() {
+                            if (hole_rect.top - endpoint.y).abs()
+                                < (hole_rect.bottom - endpoint.y).abs()
+                            {
                                 hole_rect.top
                             } else {
                                 hole_rect.bottom
-                            }
+                            },
                         )
                     } else if hole_rect.top <= endpoint.y && endpoint.y <= hole_rect.bottom {
                         // Should be adjusted to either left and right side
                         PointI32::new(
-                            if (hole_rect.left - endpoint.x).abs() < (hole_rect.right - endpoint.x).abs() {
+                            if (hole_rect.left - endpoint.x).abs()
+                                < (hole_rect.right - endpoint.x).abs()
+                            {
                                 hole_rect.left
                             } else {
                                 hole_rect.right
                             },
-                            endpoint.y
+                            endpoint.y,
                         )
                     } else {
                         // Should be adjusted to one of the corners
-                        *[ hole_rect.top_left(), hole_rect.top_right(), hole_rect.bottom_left(), hole_rect.bottom_right() ]
-                            .iter()
-                            .min_by_key(|&corner| {
-                                endpoint.to_point_f64().distance_to(corner.to_point_f64()) as i32
-                            })
-                            .unwrap()
+                        *[
+                            hole_rect.top_left(),
+                            hole_rect.top_right(),
+                            hole_rect.bottom_left(),
+                            hole_rect.bottom_right(),
+                        ]
+                        .iter()
+                        .min_by_key(|&corner| {
+                            endpoint.to_point_f64().distance_to(corner.to_point_f64()) as i32
+                        })
+                        .unwrap()
                     }
                 }
             })
@@ -295,7 +319,11 @@ impl HoleFiller {
         if depth == 0 {
             return;
         }
-        if point.x < 0 || point.x >= matrix.width as i32 || point.y < 0 || point.y >= matrix.height as i32 {
+        if point.x < 0
+            || point.x >= matrix.width as i32
+            || point.y < 0
+            || point.y >= matrix.height as i32
+        {
             return;
         }
 
@@ -309,12 +337,14 @@ impl HoleFiller {
             point + PointI32::new(1, 0),
             point + PointI32::new(0, 1),
             point + PointI32::new(-1, 0),
-            point + PointI32::new(0, -1)
+            point + PointI32::new(0, -1),
         ];
 
         matrix[point_usize] = FilledHoleElement::Texture;
 
         // Flooding to 4-neighbors
-        four_neighbors.iter().for_each(|&neighbor| Self::fill_hole_recursive(matrix, neighbor, depth-1));
+        four_neighbors
+            .iter()
+            .for_each(|&neighbor| Self::fill_hole_recursive(matrix, neighbor, depth - 1));
     }
 }

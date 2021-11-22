@@ -1,4 +1,10 @@
-use std::{collections::HashMap, hash::Hash, ops::{Index, IndexMut}, slice::Iter, vec::IntoIter};
+use std::{
+    collections::HashMap,
+    hash::Hash,
+    ops::{Index, IndexMut},
+    slice::Iter,
+    vec::IntoIter,
+};
 
 use visioncortex::PointF64;
 
@@ -61,14 +67,10 @@ impl MatchItemSet {
 
     /// Set the id's of the items to ensure uniqueness
     pub fn from_match_items_and_set_ids(mut items: Vec<MatchItem>) -> Self {
-        items.iter_mut()
-                   .enumerate()
-                   .for_each(|(i, item)| {
-                       item.id = i;
-                   });
-        Self {
-            items
-        }
+        items.iter_mut().enumerate().for_each(|(i, item)| {
+            item.id = i;
+        });
+        Self { items }
     }
 
     pub fn len(&self) -> usize {
@@ -112,9 +114,10 @@ fn sort_index_pair(pair: (usize, usize)) -> (usize, usize) {
 
 /// ONLY the pairs themselves are sorted, the whole vector is not sorted.
 fn get_sorted_index_pairs(index_pairs: &[(usize, usize)]) -> Vec<(usize, usize)> {
-    index_pairs.iter()
-               .map(|&pair| sort_index_pair(pair))
-               .collect()
+    index_pairs
+        .iter()
+        .map(|&pair| sort_index_pair(pair))
+        .collect()
 }
 
 impl PartialEq for Matching {
@@ -128,18 +131,18 @@ impl PartialEq for Matching {
         let self_sorted_index_pairs = get_sorted_index_pairs(&self.index_pairs);
         let other_sorted_index_pairs = get_sorted_index_pairs(&other.index_pairs);
 
-        let self_index_hash_map: HashMap<usize, usize> = self_sorted_index_pairs.into_iter().collect();
+        let self_index_hash_map: HashMap<usize, usize> =
+            self_sorted_index_pairs.into_iter().collect();
 
         // self == other iff all pairs in 'other_sorted_index_pairs' match the mapping
-        other_sorted_index_pairs.into_iter()
-                                .all(|(a, b)| {
-                                    let self_b_option = self_index_hash_map.get(&a);
-                                    if let Some(&self_b) = self_b_option {
-                                        self_b == b
-                                    } else {
-                                        false
-                                    }
-                                })
+        other_sorted_index_pairs.into_iter().all(|(a, b)| {
+            let self_b_option = self_index_hash_map.get(&a);
+            if let Some(&self_b) = self_b_option {
+                self_b == b
+            } else {
+                false
+            }
+        })
     }
 }
 
@@ -151,10 +154,9 @@ impl Hash for Matching {
         let self_sorted_index_pairs = get_sorted_index_pairs(&self.index_pairs);
 
         // Sums are order-invariant
-        let (sum_a, sum_b) = self_sorted_index_pairs.into_iter()
-                                                    .fold((0, 0), |(sum_a, sum_b), (a, b)| {
-                                                        (sum_a + a, sum_b + b)
-                                                    });
+        let (sum_a, sum_b) = self_sorted_index_pairs
+            .into_iter()
+            .fold((0, 0), |(sum_a, sum_b), (a, b)| (sum_a + a, sum_b + b));
         sum_a.hash(state);
         sum_b.hash(state);
     }
@@ -166,9 +168,7 @@ impl Matching {
     }
 
     pub fn from_pairs(pairs: Vec<(usize, usize)>) -> Self {
-        Self {
-            index_pairs: pairs,
-        }
+        Self { index_pairs: pairs }
     }
 
     pub fn iter(&self) -> Iter<(usize, usize)> {
@@ -179,14 +179,13 @@ impl Matching {
         self.index_pairs.into_iter()
     }
 
-    pub fn from_hungarian_result(hungarian_result: Vec<Option<usize> >) -> Self {
-        let index_pairs_iter = hungarian_result.into_iter()
-                                               .enumerate()
-                                               .map(|(i, j_option)| {
-                                                   (i, j_option.unwrap())
-                                               });
+    pub fn from_hungarian_result(hungarian_result: Vec<Option<usize>>) -> Self {
+        let index_pairs_iter = hungarian_result
+            .into_iter()
+            .enumerate()
+            .map(|(i, j_option)| (i, j_option.unwrap()));
         Self {
-            index_pairs: index_pairs_iter.collect()
+            index_pairs: index_pairs_iter.collect(),
         }
     }
 }
@@ -195,13 +194,13 @@ impl Index<usize> for SquareDistanceMatrix {
     type Output = [f64]; // Output a row for further indexing
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.distances[(index * self.n) .. ((index+1) * self.n)]
+        &self.distances[(index * self.n)..((index + 1) * self.n)]
     }
 }
 
 impl IndexMut<usize> for SquareDistanceMatrix {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.distances[(index * self.n) .. ((index+1) * self.n)]
+        &mut self.distances[(index * self.n)..((index + 1) * self.n)]
     }
 }
 
@@ -220,17 +219,12 @@ impl SquareDistanceMatrix {
             }
         }
 
-        Self {
-            n,
-            distances,
-        }
+        Self { n, distances }
     }
 
     pub fn into_matching(self) -> Matching {
         let n = self.n;
-        let matrix: Vec<u64> = self.distances.into_iter()
-                                             .map(|dist| dist as u64)
-                                             .collect();
+        let matrix: Vec<u64> = self.distances.into_iter().map(|dist| dist as u64).collect();
         let hungarian_result = hungarian::minimize(&matrix, n, n);
         Matching::from_hungarian_result(hungarian_result)
     }
@@ -264,21 +258,37 @@ mod tests {
             PointF64::new(49.72, 83.0),
         ];
 
-        let match_items_iter1 = points1.iter().map(|p| MatchItem::new_with_default_id(*p, PointF64::default()));
-        let match_items_iter2 = points2.iter().map(|p| MatchItem::new_with_default_id(*p, PointF64::default()));
+        let match_items_iter1 = points1
+            .iter()
+            .map(|p| MatchItem::new_with_default_id(*p, PointF64::default()));
+        let match_items_iter2 = points2
+            .iter()
+            .map(|p| MatchItem::new_with_default_id(*p, PointF64::default()));
 
-        let match_item_set1 = MatchItemSet::from_match_items_and_set_ids(match_items_iter1.collect());
-        let match_item_set2 = MatchItemSet::from_match_items_and_set_ids(match_items_iter2.collect());
+        let match_item_set1 =
+            MatchItemSet::from_match_items_and_set_ids(match_items_iter1.collect());
+        let match_item_set2 =
+            MatchItemSet::from_match_items_and_set_ids(match_items_iter2.collect());
 
         // WHEN
-        let distance_matrix = SquareDistanceMatrix::from_two_sets(&match_item_set1, &match_item_set2);
+        let distance_matrix =
+            SquareDistanceMatrix::from_two_sets(&match_item_set1, &match_item_set2);
 
         // THEN
         let n = points1.len();
         for i in 0..n {
             for j in 0..n {
-                println!("{} to {}: {} | {}", i, j, distance_matrix[i][j], points1[i].distance_to(points2[j]));
-                assert!(f64_approximately(distance_matrix[i][j], points1[i].distance_to(points2[j])));
+                println!(
+                    "{} to {}: {} | {}",
+                    i,
+                    j,
+                    distance_matrix[i][j],
+                    points1[i].distance_to(points2[j])
+                );
+                assert!(f64_approximately(
+                    distance_matrix[i][j],
+                    points1[i].distance_to(points2[j])
+                ));
             }
         }
     }

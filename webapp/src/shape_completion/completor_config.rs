@@ -1,5 +1,5 @@
+use super::{draw::DisplaySelector, CurveIntrapolatorConfig};
 use wasm_bindgen::prelude::*;
-use super::{CurveIntrapolatorConfig, draw::DisplaySelector};
 
 /// Configuration to ShapeCompletor
 #[wasm_bindgen]
@@ -19,7 +19,6 @@ pub struct ShapeCompletorAPIConfig {
 
     // Curve intrrpolator
     pub curve_intrapolator_config: CurveIntrapolatorConfig,
-    
 }
 
 impl Default for ShapeCompletorAPIConfig {
@@ -43,11 +42,9 @@ impl Default for ShapeCompletorAPIConfig {
 #[wasm_bindgen]
 #[allow(non_snake_case)]
 impl ShapeCompletorAPIConfig {
-
     #[wasm_bindgen(constructor)]
     pub fn new(canvas_id: &str) -> Self {
-        Self::default()
-            .canvasId(canvas_id)
+        Self::default().canvasId(canvas_id)
     }
 
     pub fn canvasId(mut self, value: &str) -> Self {
@@ -61,33 +58,33 @@ impl ShapeCompletorAPIConfig {
     }
 
     pub fn displayTangents(mut self, value: bool) -> Self {
-       self.display_tangents = value;
-       self
+        self.display_tangents = value;
+        self
     }
 
     pub fn displayControlPoints(mut self, value: bool) -> Self {
-       self.display_control_points = value;
-       self
+        self.display_control_points = value;
+        self
     }
-    
+
     pub fn holeLeft(mut self, value: usize) -> Self {
-       self.hole_left = value;
-       self
+        self.hole_left = value;
+        self
     }
-    
+
     pub fn holeTop(mut self, value: usize) -> Self {
-       self.hole_top = value;
-       self
+        self.hole_top = value;
+        self
     }
-    
+
     pub fn holeWidth(mut self, value: usize) -> Self {
-       self.hole_width = value;
-       self
+        self.hole_width = value;
+        self
     }
-    
+
     pub fn holeHeight(mut self, value: usize) -> Self {
-       self.hole_height = value;
-       self
+        self.hole_height = value;
+        self
     }
 
     pub fn holeRect(mut self, left: usize, top: usize, width: usize, height: usize) -> Self {
@@ -102,42 +99,42 @@ impl ShapeCompletorAPIConfig {
         self.simplify_tolerance = value;
         self
     }
-    
+
     // CurveInterpolatorConfig
 
     pub fn curveOutsetRatio(mut self, value: f64) -> Self {
-       self.curve_intrapolator_config.outset_ratio = value;
-       self
+        self.curve_intrapolator_config.outset_ratio = value;
+        self
     }
 
     pub fn curveMinSegmentLength(mut self, value: f64) -> Self {
-       self.curve_intrapolator_config.min_segment_length = value;
-       self
+        self.curve_intrapolator_config.min_segment_length = value;
+        self
     }
-    
+
     pub fn curveSmoothMaxIterations(mut self, value: usize) -> Self {
-       self.curve_intrapolator_config.smooth_max_iterations = value;
-       self
+        self.curve_intrapolator_config.smooth_max_iterations = value;
+        self
     }
-    
+
     pub fn curveCornerThreshold(mut self, value: f64) -> Self {
-       self.curve_intrapolator_config.corner_threshold = value;
-       self
+        self.curve_intrapolator_config.corner_threshold = value;
+        self
     }
-    
+
     pub fn curveTailTangentNumPoints(mut self, value: usize) -> Self {
-       self.curve_intrapolator_config.tail_tangent_num_points = value;
-       self
+        self.curve_intrapolator_config.tail_tangent_num_points = value;
+        self
     }
-    
+
     pub fn curveTailWeightMultiplier(mut self, value: f64) -> Self {
-       self.curve_intrapolator_config.tail_weight_multiplier = value;
-       self
+        self.curve_intrapolator_config.tail_weight_multiplier = value;
+        self
     }
-    
+
     pub fn curveControlPointsRetractRatio(mut self, value: f64) -> Self {
-       self.curve_intrapolator_config.control_points_retract_ratio = value;
-       self
+        self.curve_intrapolator_config.control_points_retract_ratio = value;
+        self
     }
 }
 
@@ -149,6 +146,4 @@ impl ShapeCompletorAPIConfig {
 }
 
 // Helper functions
-impl ShapeCompletorAPIConfig {
-
-}
+impl ShapeCompletorAPIConfig {}
