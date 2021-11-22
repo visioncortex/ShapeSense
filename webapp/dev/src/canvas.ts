@@ -1,4 +1,4 @@
-import { DisplaySelector, ShapeCompletor, ShapeCompletorAPIConfig } from "shape-completion";
+import { DisplaySelector, ShapeCompletorAPI, ShapeCompletorAPIConfig } from "shape-completion";
 
 export class DrawingCanvas {
     canvas: HTMLCanvasElement;
@@ -93,7 +93,7 @@ export class DrawingCanvas {
                 this.holeRect.w,
                 this.holeRect.h,
             );
-        ShapeCompletor.complete_shape_with_config(config);
+        ShapeCompletorAPI.complete_shape_with_config(config);
     }
 
     addUpdateLastMousePositionListener(listener: (lastMousePosition: { x: number, y: number }) => void) {

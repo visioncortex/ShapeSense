@@ -1,4 +1,5 @@
-use super::{draw::DisplaySelector, CurveIntrapolatorConfig};
+use super::{draw::DisplaySelector};
+use shapecompletion::curve::CurveIntrapolatorConfig;
 use wasm_bindgen::prelude::*;
 
 /// Configuration to ShapeCompletor
@@ -18,7 +19,7 @@ pub struct ShapeCompletorAPIConfig {
     pub simplify_tolerance: f64,
 
     // Curve intrrpolator
-    pub curve_intrapolator_config: CurveIntrapolatorConfig,
+    curve_intrapolator_config: CurveIntrapolatorConfig,
 }
 
 impl Default for ShapeCompletorAPIConfig {
@@ -140,8 +141,12 @@ impl ShapeCompletorAPIConfig {
 
 // API
 impl ShapeCompletorAPIConfig {
-    pub fn get_canvas_id(&self) -> &str {
+    pub fn canvas_id(&self) -> &str {
         &self.canvas_id
+    }
+
+    pub fn curve_intrapolator_config(&self) -> CurveIntrapolatorConfig {
+        self.curve_intrapolator_config
     }
 }
 

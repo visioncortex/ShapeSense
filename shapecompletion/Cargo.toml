@@ -1,0 +1,14 @@
+[package]
+name = "shapecompletion"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bit-vec = "0.6.3"
+flo_curves = "0.5.1"
+hungarian = "1.1.1"
+log = "0.4"
+permutator = "0.4.0"
+visioncortex = { path = "../visioncortex" }

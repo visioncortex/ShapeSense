@@ -1,26 +1,10 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{
-    clusters::Cluster, BinaryImage, BoundingRect, Color, ColorName, CompoundPath,
-    CompoundPathElement, PathI32, PointI32,
-};
-use wasm_bindgen::prelude::*;
+use visioncortex::{BinaryImage, BoundingRect, Color, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
 
-use crate::{
-    shape_completion::{
-        bezier_curves_intersection, CurveIntrapolator, CurveIntrapolatorConfig, MatchItem,
-        MatchItemSet, Matcher,
-    },
-    util::{console_log_debug_util, console_log_util},
-};
+use crate::{curve::{CurveIntrapolator, CurveIntrapolatorConfig}, debugger::{Debugger, DummyDebugger}, filler::{FilledHoleMatrix, HoleFiller}, geo::bezier_curves_intersection, matcher::Matcher, matcher_helper::{MatchItem, MatchItemSet, Matching}};
 
-use super::{
-    draw::{DisplaySelector, DrawUtil},
-    Debugger, FilledHoleMatrix, HoleFiller, Matching, ShapeCompletorAPIConfig,
-};
-
-#[wasm_bindgen]
 pub struct ShapeCompletor {
     image: BinaryImage,
     simplify_tolerance: f64,
@@ -28,59 +12,23 @@ pub struct ShapeCompletor {
     debugger: Box<dyn Debugger>,
 }
 
-// WASM API
-#[wasm_bindgen]
-impl ShapeCompletor {
-    pub fn complete_shape_with_config(config: ShapeCompletorAPIConfig) {
-        let draw_util = DrawUtil::new(
-            config.get_canvas_id(),
-            config.display_selector,
-            config.display_tangents,
-            config.display_control_points,
-        );
-        let canvas = &draw_util.canvas;
-
-        // Raw image
-        let mut image = canvas
-            .get_image_data_as_color_image(0, 0, canvas.width() as u32, canvas.height() as u32)
-            .to_binary_image(|c| c.r as usize > c.g as usize + c.b as usize);
-
-        let (x, y, w, h) = (
-            config.hole_left,
-            config.hole_top,
-            config.hole_width,
-            config.hole_height,
-        );
-
-        let hole_rect = BoundingRect::new_x_y_w_h(x as i32, y as i32, w as i32, h as i32);
-
-        // Remove hole from image
-        for x_offset in 0..hole_rect.width() {
-            for y_offset in 0..hole_rect.height() {
-                image.set_pixel(x + x_offset as usize, y + y_offset as usize, false);
-            }
-        }
-
-        let shape_completor = Self {
-            image,
-            simplify_tolerance: config.simplify_tolerance,
-            curve_intrapolator_config: config.curve_intrapolator_config,
-            debugger: Box::new(draw_util),
-        };
-
-        let result = shape_completor.complete_shape_and_draw_expandable(hole_rect);
-
-        match result {
-            Ok(_) => {}
-            Err(error) => {
-                panic!("{}", error)
-            }
-        }
-    }
-}
-
 // API
 impl ShapeCompletor {
+    pub fn new(
+        image: BinaryImage,
+        simplify_tolerance: f64,
+        curve_intrapolator_config: CurveIntrapolatorConfig,
+        debugger: Option<Box<dyn Debugger>>,
+    ) -> Self
+    {
+        Self {
+            image,
+            simplify_tolerance,
+            curve_intrapolator_config,
+            debugger: debugger.unwrap_or_else(|| Box::new(DummyDebugger)),
+        }
+    }
+
     pub fn complete_shape_and_draw(&self, hole_rect: BoundingRect) -> Result<(), String> {
         let hole_origin = PointI32::new(hole_rect.left, hole_rect.top);
         let filled_hole = self.complete_shape(hole_rect)?;

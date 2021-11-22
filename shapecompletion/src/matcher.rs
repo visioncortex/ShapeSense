@@ -6,9 +6,8 @@ use std::{
 use permutator::{factorial, multiply_factorial, Combination};
 use visioncortex::PointF64;
 
-use crate::{shape_completion::SquareDistanceMatrix, util::console_log_util};
+use crate::matcher_helper::{MatchItem, MatchItemSet, Matching, SquareDistanceMatrix};
 
-use super::{MatchItem, MatchItemSet, Matching};
 
 /// Given a set of an even number of 2-D points and direction vectors at those points,
 /// find a complete, disjoint, pair matching of those points such that the sum of distances between the pairs is at minimum.

@@ -7,8 +7,6 @@ use std::{
 use flo_curves::{bezier::Curve, BezierCurve, Coord2, Coordinate2D};
 use visioncortex::{BinaryImage, BoundingRect, CompoundPath, PointF64, PointI32, PointUsize};
 
-use crate::util::{console_log_debug_util, console_log_util};
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum FilledHoleElement {
     Blank,

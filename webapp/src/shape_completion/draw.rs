@@ -1,3 +1,4 @@
+use shapecompletion::{debugger::Debugger, filler::{FilledHoleElement, FilledHoleMatrix}};
 use wasm_bindgen::prelude::*;
 
 use std::convert::TryInto;
@@ -6,8 +7,6 @@ use visioncortex::{Color, ColorName, CompoundPath, PathF64, PathI32, PointF64, P
 use web_sys::CanvasRenderingContext2d;
 
 use crate::{canvas::Canvas, util::console_log_util};
-
-use super::{Debugger, FilledHoleMatrix};
 
 #[wasm_bindgen]
 #[derive(Clone, Copy, PartialEq)]
@@ -179,9 +178,9 @@ impl Debugger for DrawUtil {
             for j in 0..filled_hole.width {
                 let target = origin + PointI32::new(j as i32, i as i32);
                 let color = match filled_hole[i][j] {
-                    super::FilledHoleElement::Blank => blank,
-                    super::FilledHoleElement::Structure => structure,
-                    super::FilledHoleElement::Texture => texture,
+                    FilledHoleElement::Blank => blank,
+                    FilledHoleElement::Structure => structure,
+                    FilledHoleElement::Texture => texture,
                 };
                 self.draw_pixel_i32(&color, target);
             }
