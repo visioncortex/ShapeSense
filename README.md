@@ -169,3 +169,5 @@ From experimentation, we observed that most of the pain-inducing geometrical con
 As shown above, the performance of our implementation is stable for the most part. Occasionally, the pipeline incorrectly handles the cases when tail tangents are (nearly) coincident to the hole boundaries.
 
 ![Breaks down when tail tangents are coincident to boundary](images/unstability.png)
+
+Such errors are detected but not recovered from.

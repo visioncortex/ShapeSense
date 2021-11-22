@@ -157,7 +157,7 @@ impl ShapeCompletor {
             .map(|segment| segment[0] )
             .collect();
 
-        Ok( HoleFiller::fill(&self.image, hole_rect, intrapolated_curves, endpoints) )
+        HoleFiller::fill(&self.image, hole_rect, intrapolated_curves, endpoints)
     }
 }
 

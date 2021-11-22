@@ -89,14 +89,13 @@ impl HoleFiller {
        hole_rect: BoundingRect,
        intrapolated_curves: Vec<CompoundPath>,
        endpoints: Vec<PointI32>
-    ) -> FilledHoleMatrix {
+    ) -> Result<FilledHoleMatrix, String> {
         let matrix = FilledHoleMatrix::new(hole_rect.width() as usize, hole_rect.height() as usize);
         let origin = PointI32::new(hole_rect.left, hole_rect.top);
 
         let matrix = Self::rasterize_intrapolated_curves(matrix, intrapolated_curves, origin);
 
         Self::fill_holes(matrix, image, hole_rect, origin, endpoints)
-        // matrix
    }
 }
 
@@ -161,7 +160,7 @@ impl HoleFiller {
     }
 
     /// The behavior is undefined unless 'offset' is the top-left corner of 'hole_rect' (exactly on its boundary).
-    fn fill_holes(mut matrix: FilledHoleMatrix, image: &BinaryImage, hole_rect: BoundingRect, offset: PointI32, endpoints: Vec<PointI32>) -> FilledHoleMatrix {
+    fn fill_holes(mut matrix: FilledHoleMatrix, image: &BinaryImage, hole_rect: BoundingRect, offset: PointI32, endpoints: Vec<PointI32>) -> Result<FilledHoleMatrix, String> {
         let max_depth = std::usize::MAX;
 
         let endpoints = Self::adjust_endpoints(&hole_rect, endpoints);
@@ -203,6 +202,7 @@ impl HoleFiller {
 
         // Go to next segment. If previous segment was filled, skip this segment, or vice versa.
         // Repeat this until the first endpoint is seen again.
+        let mut just_filled = false;
         loop { // Not back to the first endpoint yet
             let prev_endpoint = current_point;
             let mut total_pixels = 0_usize;
@@ -219,6 +219,10 @@ impl HoleFiller {
                 }
             }
             if total_pixels > 3 && filled_pixels >= (total_pixels >> 1) {
+                if just_filled {
+                    return Err("Consecutive filling.".into());
+                }
+
                 let sampled_mid_point = sample_point(prev_endpoint, current_point);
                 let sampled_points = vec![
                     sample_point(prev_endpoint, sampled_mid_point),
@@ -230,6 +234,10 @@ impl HoleFiller {
                     let inside_point = eval_inside_point(sampled_point);
                     Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
                 });
+
+                just_filled = true;
+            } else {
+                just_filled = false;
             }
 
             if current_point == 0 {
@@ -237,7 +245,7 @@ impl HoleFiller {
             }
         }
 
-        matrix
+        Ok(matrix)
     }
 
     // Correction for endpoints off boundary
