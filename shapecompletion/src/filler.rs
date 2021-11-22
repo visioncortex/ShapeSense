@@ -296,7 +296,7 @@ impl HoleFiller {
                         )
                     } else {
                         // Should be adjusted to one of the corners
-                        *[
+                        *([
                             hole_rect.top_left(),
                             hole_rect.top_right(),
                             hole_rect.bottom_left(),
@@ -306,7 +306,7 @@ impl HoleFiller {
                         .min_by_key(|&corner| {
                             endpoint.to_point_f64().distance_to(corner.to_point_f64()) as i32
                         })
-                        .unwrap()
+                        .unwrap())
                     }
                 }
             })
