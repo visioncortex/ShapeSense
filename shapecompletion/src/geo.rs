@@ -221,3 +221,28 @@ pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
         })
     })
 }
+
+/// Retract a point towards another point until the supplied predicate returns true or n retractions have been done.
+/// The direction is (0: from) -> (1: to).
+/// The behavior is undefined unless 0.0 <= retract_ratio <= 1.0
+pub fn retract_point<P> (
+    mut from: PointF64,
+    to: PointF64,
+    retract_ratio: f64,
+    predicate: P,
+    n: Option<usize>,
+) -> PointF64
+where
+    P: Fn(PointF64) -> bool
+{
+    assert!(0.0 <= retract_ratio);
+    assert!(retract_ratio <= 1.0);
+
+    let mut i = n.unwrap_or_default();
+    while !predicate(from) && (n.is_none() || i > 0)
+    {
+        from = calculate_in_between_point(from, to, retract_ratio);
+        i -= 1;
+    }
+    from
+}
