@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn square_distance_matrix_correct_distances() {
         // GIVEN
-        let points1 = vec![
+        let points1 = [
             PointF64::new(0.0, 0.0),
             PointF64::new(0.0, 2.0),
             PointF64::new(3.199, 82.3),
@@ -255,7 +255,7 @@ mod tests {
             PointF64::new(76.2, 35.89),
             PointF64::new(19.84, 85.8),
         ];
-        let points2 = vec![
+        let points2 = [
             PointF64::new(12.68, 29.86),
             PointF64::new(84.6, 20.46),
             PointF64::new(16.2, 214.5),

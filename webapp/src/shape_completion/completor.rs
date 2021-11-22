@@ -72,13 +72,13 @@ impl ShapeCompletor {
                 error += "\n";
                 let try_expand = || {
                     let (x, y, w, h) = (hole_rect.left, hole_rect.top, hole_rect.width(), hole_rect.height());
-                    let expanded_hole_rects = vec![
+                    let expanded_hole_rects = [
                         BoundingRect::new_x_y_w_h(x-1, y, w+1, h), // Expanded to the left
                         BoundingRect::new_x_y_w_h(x, y-1, w, h+1), // Expanded upward
                         BoundingRect::new_x_y_w_h(x, y, w+1, h), // Expanded to the right
                         BoundingRect::new_x_y_w_h(x, y, w, h+1), // Expanded downward
                     ];
-                    for (i, expanded_hole_rect) in expanded_hole_rects.into_iter().enumerate() {
+                    for (i, &expanded_hole_rect) in expanded_hole_rects.iter().enumerate() {
                         if 0 <= hole_rect.left && hole_rect.right <= self.image.width as i32
                             && 0 <= hole_rect.top && hole_rect.bottom <= self.image.height as i32 {
                             

@@ -224,13 +224,13 @@ impl HoleFiller {
                 }
 
                 let sampled_mid_point = sample_point(prev_endpoint, current_point);
-                let sampled_points = vec![
+                let sampled_points = [
                     sample_point(prev_endpoint, sampled_mid_point),
                     sampled_mid_point,
                     sample_point(sampled_mid_point, current_point),
                 ];
 
-                sampled_points.into_iter().for_each(|sampled_point| {
+                sampled_points.iter().for_each(|&sampled_point| {
                     let inside_point = eval_inside_point(sampled_point);
                     Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
                 });
@@ -305,23 +305,16 @@ impl HoleFiller {
             return;
         }
 
-        let four_neighbors = vec![
+        let four_neighbors = [
             point + PointI32::new(1, 0),
             point + PointI32::new(0, 1),
             point + PointI32::new(-1, 0),
             point + PointI32::new(0, -1)
         ];
 
-        let diagonal_neighbors = vec![
-            point + PointI32::new(-1, -1),
-            point + PointI32::new(1, -1),
-            point + PointI32::new(1, 1),
-            point + PointI32::new(-1, 1),
-        ];
-
         matrix[point_usize] = FilledHoleElement::Texture;
 
         // Flooding to 4-neighbors
-        four_neighbors.into_iter().for_each(|neighbor| Self::fill_hole_recursive(matrix, neighbor, depth-1));
+        four_neighbors.iter().for_each(|&neighbor| Self::fill_hole_recursive(matrix, neighbor, depth-1));
     }
 }
