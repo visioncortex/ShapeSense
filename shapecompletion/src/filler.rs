@@ -245,7 +245,7 @@ impl HoleFiller {
 
                 sampled_points.iter().for_each(|&sampled_point| {
                     let inside_point = eval_inside_point(sampled_point);
-                    Self::fill_hole_recursive(&mut matrix, inside_point - offset, max_depth);
+                    Self::fill_hole_iterative(&mut matrix, inside_point - offset);
                 });
 
                 just_filled = true;
@@ -344,5 +344,42 @@ impl HoleFiller {
         four_neighbors
             .iter()
             .for_each(|&neighbor| Self::fill_hole_recursive(matrix, neighbor, depth - 1));
+    }
+
+    fn fill_hole_iterative(matrix: &mut FilledHoleMatrix, seed: PointI32) {
+        let mut stack = vec![seed];
+        while !stack.is_empty() {
+            let point = stack.pop().unwrap();
+
+            // Out of range
+            if point.x < 0
+                || point.x >= matrix.width as i32
+                || point.y < 0
+                || point.y >= matrix.height as i32
+            {
+                continue;
+            }
+
+            let point_usize = point.to_point_usize();
+
+            // Already filled
+            if matrix[point_usize] != FilledHoleElement::Blank {
+                continue;
+            }
+
+            // Fill it
+            matrix[point_usize] = FilledHoleElement::Texture;
+
+            [
+                point + PointI32::new(1, 0),
+                point + PointI32::new(0, 1),
+                point + PointI32::new(-1, 0),
+                point + PointI32::new(0, -1),
+            ]
+                .iter()
+                .for_each(|neighbor| {
+                    stack.push(*neighbor);
+                });
+        }
     }
 }
