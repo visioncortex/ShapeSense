@@ -35,6 +35,7 @@ pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
     PointF64::new(-dy, dx).get_normalized()
 }
 
+#[derive(Debug)]
 pub enum LineIntersectionResult {
     Intersect(PointF64), // The segments can be extended in the positive directions to intersect at this point
     Parallel,            // No intersection at all
@@ -60,8 +61,10 @@ pub fn calculate_intersection(
     let denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
     let numera_a = (x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3);
     let numera_b = (x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3);
-    // All of denom, numera_a and numera_b are 0
-    if f64_approximately(denom + numera_a + numera_b, 0.0) {
+    if f64_approximately(denom, 0.0)
+        && f64_approximately(numera_a, 0.0)
+        && f64_approximately(numera_b, 0.0)
+    {
         return LineIntersectionResult::Coincidence;
     }
     if f64_approximately(denom, 0.0) {
