@@ -19,24 +19,24 @@ fn f64_approximately(a: f64, b: f64) -> bool {
 /// 0.5 : midpoint
 ///
 /// 1 : 'to'
-pub fn calculate_in_between_point(from: PointF64, to: PointF64, ratio: f64) -> PointF64 {
+pub(super) fn calculate_in_between_point(from: PointF64, to: PointF64, ratio: f64) -> PointF64 {
     let dir = to - from;
     from + dir * ratio
 }
 
-pub fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
+pub(super) fn calculate_midpoint(p1: PointF64, p2: PointF64) -> PointF64 {
     calculate_in_between_point(p1, p2, 0.5)
 }
 
 /// Given a line p1p2, returns its unit normal at right hand side.
 /// Note that the negative of the returned vector is the unit normal at left hand side.
-pub fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
+pub(super) fn calculate_unit_normal_of_line(p1: PointF64, p2: PointF64) -> PointF64 {
     let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
     PointF64::new(-dy, dx).get_normalized()
 }
 
 #[derive(Debug)]
-pub enum LineIntersectionResult {
+pub(super) enum LineIntersectionResult {
     Intersect(PointF64), // The segments can be extended in the positive directions to intersect at this point
     Parallel,            // No intersection at all
     Coincidence,         // Infinite intersections (extended or not)
@@ -44,7 +44,7 @@ pub enum LineIntersectionResult {
 }
 
 // Given directed lines p1p2 and p3p4, returns their intersection result.
-pub fn calculate_intersection(
+pub(super) fn calculate_intersection(
     p1: PointF64,
     p2: PointF64,
     p3: PointF64,
@@ -82,7 +82,7 @@ pub fn calculate_intersection(
 }
 
 /// Find the inclined angle of a point in (-pi, pi].
-pub fn angle_of_point(p: &PointF64) -> f64 {
+pub(super) fn angle_of_point(p: &PointF64) -> f64 {
     if p.y.is_sign_negative() {
         -p.x.acos()
     } else {
@@ -92,7 +92,7 @@ pub fn angle_of_point(p: &PointF64) -> f64 {
 
 /// Given two ordered angles in (-pi,pi], find the signed angle difference between them.
 /// Positive in clockwise direction, the 0-degree axis is the positive x axis
-pub fn signed_angle_difference(from: &f64, to: &f64) -> f64 {
+pub(super) fn signed_angle_difference(from: &f64, to: &f64) -> f64 {
     let v1 = *from;
     let mut v2 = *to;
     if v1 > v2 {
@@ -109,7 +109,9 @@ pub fn signed_angle_difference(from: &f64, to: &f64) -> f64 {
 
 /// Takes a path representing an arbitrary curve, returns a vector of bool representing its corners
 /// (angle in radians bigger than or equal to 'threshold').
-pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
+/// `path` is considered to be open (not forming a closed shape);
+/// If the first and last points of `path` are the same, the last point is ignored.
+pub(super) fn find_corners_open_path(path: &PathF64, threshold: f64) -> Vec<bool> {
     if path.is_empty() {
         return vec![];
     }
@@ -139,7 +141,7 @@ pub fn find_corners(path: &PathF64, threshold: f64) -> Vec<bool> {
 
 /// Finds mid-points between (p_i and p_j) and (p_1 and p_2), where p_i and p_j should be between p_1 and p_2,
 /// then returns the new point constructed by the 4-point scheme
-pub fn find_new_point_from_4_point_scheme(
+pub(super) fn find_new_point_from_4_point_scheme(
     p_i: &PointF64,
     p_j: &PointF64,
     p_1: &PointF64,
@@ -151,7 +153,7 @@ pub fn find_new_point_from_4_point_scheme(
 
     let vector_out = mid_out - mid_in;
     let new_magnitude = vector_out.norm() / outset_ratio;
-    if new_magnitude < 1e-5 {
+    if new_magnitude < f64::EPSILON {
         // mid_out == mid_in in this case
         return mid_out;
     }
@@ -163,7 +165,7 @@ pub fn find_new_point_from_4_point_scheme(
 /// Determine if any curves in one of the compound paths intersect with another curve in another compound path.
 /// Assume that no curves within any single compound path intersect with each other.
 /// The behavior is undefined unless all elements in all compound paths are Spline and contain exactly 1 curve.
-pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
+pub(super) fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
     // Assertion
     compound_curves.iter().for_each(|compound_curve| {
         compound_curve.iter().for_each(|curve| {
@@ -228,7 +230,7 @@ pub fn bezier_curves_intersection(compound_curves: &[CompoundPath]) -> bool {
 /// Retract a point towards another point until the supplied predicate returns true or n retractions have been done.
 /// The direction is (0: from) -> (1: to).
 /// The behavior is undefined unless 0.0 <= retract_ratio <= 1.0
-pub fn retract_point<P> (
+pub(super) fn retract_point<P> (
     mut from: PointF64,
     to: PointF64,
     retract_ratio: f64,

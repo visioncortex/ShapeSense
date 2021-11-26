@@ -1,6 +1,6 @@
 use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
 
-use crate::{debugger::Debugger, geo::{LineIntersectionResult, calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, find_corners, find_new_point_from_4_point_scheme, retract_point}};
+use crate::{debugger::Debugger, geo::{LineIntersectionResult, calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, find_corners_open_path, find_new_point_from_4_point_scheme, retract_point}};
 
 #[derive(Clone, Copy)]
 pub struct CurveIntrapolatorConfig {
@@ -161,7 +161,7 @@ impl<'a> CurveIntrapolator<'a> {
         max_iterations: usize,
         corner_threshold: f64,
     ) -> (PathF64, Vec<bool>) {
-        let mut corners = find_corners(&path, corner_threshold);
+        let mut corners = find_corners_open_path(&path, corner_threshold);
 
         if path.len() < 4 {
             return (path, corners);
