@@ -26,7 +26,7 @@ The first image is the ground truth (for reference only). The second image is th
 
 The first stage of the pipeline is to obtain and process the paths (curves) representing the existing outline of the shape.
 
-[Vision Cortex's library](https://github.com/visioncortex/visioncortex) provides the necessary utilities to extract raw paths from an image.
+[Vision Cortex's core library](https://github.com/visioncortex/visioncortex) provides the necessary utilities to extract raw paths from an image.
 
 ![Path segments after preprocessing](images/simple/ellipse_preprocessed_process.png)
 Yellow pixels denote the identified outline of the shape after simplification.
@@ -104,9 +104,9 @@ The Structure elements divide the hole into several subregions. Each of these su
 
 ![Hole of ellipse divided into two subregions](images/simple/filling_subregions.png)
 
-In our example, the hole is divided by the intrapolated curve into two subregions. In order to guess whether to fill the subregions with Blank or Texture elements, we take majority votes among the pixels around the hole.
+In our example, the hole is divided by the intrapolated curve into two subregions. In order to guess whether to fill the subregions with Blank or Texture elements, we check if the number of Blank elements outside the hole boundary exceeds a certain tolerance.
 
-For the bottom subregion, the pixels right outside the bottom boundary are mostly red (Texture), therefore this subregion is classified as Texture and filled with Texture elements.
+For the bottom subregion, the pixels right outside the bottom boundary are (almost) all red (Texture), therefore this subregion is classified as Texture and filled with Texture elements.
 
 For the top subregion, the pixels outside the left, top, and right sides of the boundary are considered. All of those pixels are background (Blank), so this subregion is classified as Blank.
 
@@ -154,7 +154,7 @@ This [webpage](https://prase.cz/kalva/putnam/psoln/psol794.html) shows that mini
 
 The rest of the intersecting curves have to be caught and filtered out after intrapolation has taken place. Bézier curve intersection can be detected by a recursive method called [De Casteljau's (Bézier Clipping) algorithm](https://en.wikipedia.org/wiki/De_Casteljau%27s_algorithm), which is implemented in [flo_curves](https://crates.io/crates/flo_curves), the Bézier curve library we use.
 
-# Stability and Robustness
+# Robustness
 
 Throughout the process of development, we encountered many edge cases where the pipeline would break down when faced with certain geometrical configurations. For example, an endpoint detected at the corner of the hole may or may not be useful, because it may be an edge entering the hole at a corner, or it may just be the hole touching an edge with its corner.
 
@@ -166,8 +166,6 @@ From experimentation, we observed that most of the pain-inducing geometrical con
 
 ![Animated Demo](images/animated_demo.gif)
 
-As shown above, the performance of our implementation is stable for the most part. Occasionally, the pipeline incorrectly handles the cases when tail tangents are (nearly) coincident to the hole boundaries.
+As shown above, the performance of our implementation is stable for the most part. Occasionally, the pipeline (arguably) incorrectly handles the cases when tail tangents are (nearly) coincident to the hole boundaries.
 
-![Breaks down when tail tangents are coincident to boundary](images/unstability.png)
-
-Such errors are detected but not recovered from.
+![Arguably incorrect case](images/incorrect.png)
