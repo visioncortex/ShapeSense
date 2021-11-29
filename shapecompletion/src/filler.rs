@@ -237,7 +237,7 @@ impl HoleFiller {
                     break;
                 }
             }
-            if total_outside_pixels > 3 && blank_outside_pixels <= blank_boundary_pixels_threshold {
+            if total_outside_pixels > blank_boundary_pixels_threshold && blank_outside_pixels <= blank_boundary_pixels_threshold {
                 let sampled_mid_point = sample_point(prev_endpoint, current_point);
                 let sampled_points = [
                     sample_point(prev_endpoint, sampled_mid_point),
@@ -254,6 +254,8 @@ impl HoleFiller {
             if current_point == 0 {
                 break;
             }
+
+            current_point = (current_point + 1) % num_points;
         }
 
         Ok(matrix)
