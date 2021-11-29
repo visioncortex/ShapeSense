@@ -9,6 +9,7 @@ pub struct ShapeCompletor {
     image: BinaryImage,
     simplify_tolerance: f64,
     curve_intrapolator_config: CurveIntrapolatorConfig,
+    filler_blank_boundary_pixels_tolerance: usize,
     debugger: Box<dyn Debugger>,
 }
 
@@ -18,6 +19,7 @@ impl ShapeCompletor {
         image: BinaryImage,
         simplify_tolerance: f64,
         curve_intrapolator_config: CurveIntrapolatorConfig,
+        filler_blank_boundary_pixels_tolerance: usize,
         debugger: Option<Box<dyn Debugger>>,
     ) -> Self
     {
@@ -25,6 +27,7 @@ impl ShapeCompletor {
             image,
             simplify_tolerance,
             curve_intrapolator_config,
+            filler_blank_boundary_pixels_tolerance,
             debugger: debugger.unwrap_or_else(|| Box::new(DummyDebugger)),
         }
     }
@@ -138,7 +141,7 @@ impl ShapeCompletor {
             .map(|segment| segment[0])
             .collect();
 
-        HoleFiller::fill(&self.image, hole_rect, intrapolated_curves, endpoints)
+        HoleFiller::fill(&self.image, hole_rect, intrapolated_curves, endpoints, self.filler_blank_boundary_pixels_tolerance)
     }
 }
 

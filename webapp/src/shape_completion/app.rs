@@ -46,6 +46,7 @@ impl ShapeCompletorAPI {
             image,
             config.simplify_tolerance,
             config.curve_intrapolator_config(),
+            config.filler_blank_boundary_pixels_tolerance,
             Some(Box::new(draw_util)),
         );
 

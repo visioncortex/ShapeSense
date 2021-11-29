@@ -20,6 +20,15 @@ pub struct ShapeCompletorAPIConfig {
 
     // Curve intrrpolator
     curve_intrapolator_config: CurveIntrapolatorConfig,
+
+    // Filler
+    /// The maximum number of blank pixels outside the hole boundary allowed
+    /// for a subregion to still be filled.
+    /// 
+    /// That is, if, among the pixels outside the hole boundary of a subregion,
+    /// `filler_blank_boundary_pixels_tolerance` or less pixels are blank, then
+    /// that subregion will be filled.
+    pub filler_blank_boundary_pixels_tolerance: usize,
 }
 
 impl Default for ShapeCompletorAPIConfig {
@@ -35,6 +44,7 @@ impl Default for ShapeCompletorAPIConfig {
             hole_height: 15,
             simplify_tolerance: 2.0,
             curve_intrapolator_config: Default::default(),
+            filler_blank_boundary_pixels_tolerance: 3,
         }
     }
 }
