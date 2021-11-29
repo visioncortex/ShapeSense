@@ -38,34 +38,43 @@ pub trait Debugger {
 pub struct DummyDebugger;
 
 impl Debugger for DummyDebugger {
+    fn should_draw_simplified(&self) -> bool {
+        false
+    }
 
-    fn should_draw_simplified(&self) -> bool { false }
+    fn should_draw_smoothed(&self) -> bool {
+        false
+    }
 
-    fn should_draw_smoothed(&self) -> bool { false }
+    fn should_draw_control_points(&self) -> bool {
+        false
+    }
 
-    fn should_draw_control_points(&self) -> bool { false }
+    fn should_draw_tail_tangents(&self) -> bool {
+        false
+    }
 
-    fn should_draw_tail_tangents(&self) -> bool { false }
+    fn fill_rect(&self, _color: &Color, _x: usize, _y: usize, _w: usize, _h: usize) {}
 
-    fn fill_rect(&self, _color: &Color, _x: usize, _y: usize, _w: usize, _h: usize) { }
+    fn draw_pixel_i32(&self, _color: &Color, _point: PointI32) {}
 
-    fn draw_pixel_i32(&self, _color: &Color, _point: PointI32) { }
+    fn draw_cross_i32(&self, _color: &Color, _center: PointI32) {}
 
-    fn draw_cross_i32(&self, _color: &Color, _center: PointI32) { }
+    fn draw_path_i32(&self, _color: &Color, _path: &PathI32) {}
 
-    fn draw_path_i32(&self, _color: &Color, _path: &PathI32) { }
+    fn draw_path_f64(&self, _color: &Color, _path: &PathF64) {}
 
-    fn draw_path_f64(&self, _color: &Color, _path: &PathF64) { }
+    fn draw_line_f64(&self, _color: &Color, _from: PointF64, _to: PointF64) {}
 
-    fn draw_line_f64(&self, _color: &Color, _from: PointF64, _to: PointF64) { }
+    fn draw_spline(&self, _color: &Color, _spline: &Spline) {}
 
-    fn draw_spline(&self, _color: &Color, _spline: &Spline) { }
+    fn draw_cubic_bezier_curve(&self, _color: &Color, _control_points: [PointF64; 4]) {}
 
-    fn draw_cubic_bezier_curve(&self, _color: &Color, _control_points: [PointF64; 4]) { }
+    fn draw_compound_path(&self, _color: &Color, _compound_path: &CompoundPath) {}
 
-    fn draw_compound_path(&self, _color: &Color, _compound_path: &CompoundPath) { }
+    fn draw_filled_hole(&self, _filled_hole: FilledHoleMatrix, _origin: PointI32) {}
 
-    fn draw_filled_hole(&self, _filled_hole: FilledHoleMatrix, _origin: PointI32) { }
-
-    fn log(&self, msg: &str) { log::info!("{}", msg); }
+    fn log(&self, msg: &str) {
+        log::info!("{}", msg);
+    }
 }

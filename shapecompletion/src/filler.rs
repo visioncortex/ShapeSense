@@ -98,7 +98,14 @@ impl HoleFiller {
 
         let matrix = Self::rasterize_intrapolated_curves(matrix, intrapolated_curves, origin);
 
-        Self::fill_holes(matrix, image, hole_rect, origin, endpoints, blank_broundary_pixels_threshold)
+        Self::fill_holes(
+            matrix,
+            image,
+            hole_rect,
+            origin,
+            endpoints,
+            blank_broundary_pixels_threshold,
+        )
     }
 }
 
@@ -287,14 +294,12 @@ impl HoleFiller {
                         )
                     } else {
                         // Should be adjusted to one of the corners
-                        IntoIterator::into_iter(
-                            [
-                                hole_rect.top_left(),
-                                hole_rect.top_right(),
-                                hole_rect.bottom_left(),
-                                hole_rect.bottom_right(),
-                            ]
-                        )
+                        IntoIterator::into_iter([
+                            hole_rect.top_left(),
+                            hole_rect.top_right(),
+                            hole_rect.bottom_left(),
+                            hole_rect.bottom_right(),
+                        ])
                         .min_by_key(|&corner| {
                             endpoint.to_point_f64().distance_to(corner.to_point_f64()) as i32
                         })
@@ -330,14 +335,13 @@ impl HoleFiller {
             // Fill it
             matrix[point_usize] = FilledHoleElement::Texture;
 
-            IntoIterator::into_iter(
-                [
-                    point + PointI32::new(1, 0),
-                    point + PointI32::new(0, 1),
-                    point + PointI32::new(-1, 0),
-                    point + PointI32::new(0, -1),
-                ]
-            ).for_each(|neighbor| {
+            IntoIterator::into_iter([
+                point + PointI32::new(1, 0),
+                point + PointI32::new(0, 1),
+                point + PointI32::new(-1, 0),
+                point + PointI32::new(0, -1),
+            ])
+            .for_each(|neighbor| {
                 stack.push(neighbor);
             });
         }

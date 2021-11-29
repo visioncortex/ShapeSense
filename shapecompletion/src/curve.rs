@@ -1,6 +1,13 @@
 use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
 
-use crate::{debugger::Debugger, geo::{LineIntersectionResult, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, find_corners_open_path, find_new_point_from_4_point_scheme, retract_point}};
+use crate::{
+    debugger::Debugger,
+    geo::{
+        calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line,
+        find_corners_open_path, find_new_point_from_4_point_scheme, retract_point,
+        LineIntersectionResult,
+    },
+};
 
 #[derive(Clone, Copy)]
 pub struct CurveIntrapolatorConfig {
@@ -138,12 +145,7 @@ impl<'a> CurveIntrapolator<'a> {
         }
 
         //# Curve intrapolation
-        self.calculate_whole_curve(
-            endpoint1,
-            tail_tangent1,
-            endpoint2,
-            tail_tangent2,
-        )
+        self.calculate_whole_curve(endpoint1, tail_tangent1, endpoint2, tail_tangent2)
     }
 }
 
@@ -347,7 +349,13 @@ impl<'a> CurveIntrapolator<'a> {
                     )?;
                     compound_path.add_spline(spline);
                 } else {
-                    self.cut_two_curves_and_insert(&mut compound_path, from_point, from_tangent, to_point, to_tangent)?;
+                    self.cut_two_curves_and_insert(
+                        &mut compound_path,
+                        from_point,
+                        from_tangent,
+                        to_point,
+                        to_tangent,
+                    )?;
                 }
             }
             LineIntersectionResult::Coincidence => {
@@ -362,14 +370,27 @@ impl<'a> CurveIntrapolator<'a> {
                 compound_path.add_spline(line);
             }
             LineIntersectionResult::None => {
-                self.cut_two_curves_and_insert(&mut compound_path, from_point, from_tangent, to_point, to_tangent)?;
+                self.cut_two_curves_and_insert(
+                    &mut compound_path,
+                    from_point,
+                    from_tangent,
+                    to_point,
+                    to_tangent,
+                )?;
             }
         };
 
         Some(compound_path)
     }
 
-    fn cut_two_curves_and_insert(&self, compound_path: &mut CompoundPath, point_a: PointF64, tangent_a: PointF64, point_b: PointF64, tangent_b: PointF64) -> Option<()> {
+    fn cut_two_curves_and_insert(
+        &self,
+        compound_path: &mut CompoundPath,
+        point_a: PointF64,
+        tangent_a: PointF64,
+        point_b: PointF64,
+        tangent_b: PointF64,
+    ) -> Option<()> {
         // S-shape detected
         // Divide into 2 parts and concatenate
         let mid_point = calculate_midpoint(point_a, point_b);
@@ -421,13 +442,15 @@ impl<'a> CurveIntrapolator<'a> {
         let retract_max_n = Some(1000);
 
         let (control_point1, control_point2) = match whole_intersection_result {
-            LineIntersectionResult::Intersect(intersection) => {
-                self.evaluate_control_points_with_intersection(from_point, from_tangent, to_point, to_tangent, intersection)
-            },
-            LineIntersectionResult::Parallel => (
-                from_point + from_tangent,
-                to_point + to_tangent,
-            ),
+            LineIntersectionResult::Intersect(intersection) => self
+                .evaluate_control_points_with_intersection(
+                    from_point,
+                    from_tangent,
+                    to_point,
+                    to_tangent,
+                    intersection,
+                ),
+            LineIntersectionResult::Parallel => (from_point + from_tangent, to_point + to_tangent),
             LineIntersectionResult::Coincidence => panic!("Part curves do not handle coincidence."),
             LineIntersectionResult::None => {
                 // Whole curve has been divided -> recalculate intersection
@@ -438,9 +461,14 @@ impl<'a> CurveIntrapolator<'a> {
                     to_point + to_tangent,
                 );
                 match intersection_result {
-                    LineIntersectionResult::Intersect(intersection) => {
-                        self.evaluate_control_points_with_intersection(from_point, from_tangent, to_point, to_tangent, intersection)
-                    }
+                    LineIntersectionResult::Intersect(intersection) => self
+                        .evaluate_control_points_with_intersection(
+                            from_point,
+                            from_tangent,
+                            to_point,
+                            to_tangent,
+                            intersection,
+                        ),
                     LineIntersectionResult::Parallel => {
                         (from_point + from_tangent, to_point + to_tangent)
                     }
@@ -453,8 +481,20 @@ impl<'a> CurveIntrapolator<'a> {
         };
 
         let (control_point1, control_point2) = (
-            retract_point(control_point1, from_point, retract_ratio, retract_predicate, retract_max_n),
-            retract_point(control_point2, to_point, retract_ratio, retract_predicate, retract_max_n),
+            retract_point(
+                control_point1,
+                from_point,
+                retract_ratio,
+                retract_predicate,
+                retract_max_n,
+            ),
+            retract_point(
+                control_point2,
+                to_point,
+                retract_ratio,
+                retract_predicate,
+                retract_max_n,
+            ),
         );
         let mut spline = Spline::new(from_point);
         spline.add(control_point1, control_point2, to_point);
@@ -467,9 +507,8 @@ impl<'a> CurveIntrapolator<'a> {
         from_tangent: PointF64,
         to_point: PointF64,
         to_tangent: PointF64,
-        intersection: PointF64
-    ) -> (PointF64, PointF64)
-    {
+        intersection: PointF64,
+    ) -> (PointF64, PointF64) {
         let scaled_base_length = from_point.distance_to(to_point) * 2.0;
 
         let length_from_and_intersection = from_point.distance_to(intersection);
@@ -483,7 +522,7 @@ impl<'a> CurveIntrapolator<'a> {
                     point + tangent * scaled_base_length
                 }
             };
-            
+
         (
             calculate_control_point(from_point, from_tangent, length_from_and_intersection),
             calculate_control_point(to_point, to_tangent, length_to_and_intersection),

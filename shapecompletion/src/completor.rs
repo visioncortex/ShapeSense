@@ -1,9 +1,19 @@
 use std::collections::HashSet;
 
 use bit_vec::BitVec;
-use visioncortex::{BinaryImage, BoundingRect, Color, ColorName, CompoundPath, CompoundPathElement, PathI32, PointI32, clusters::Cluster};
+use visioncortex::{
+    clusters::Cluster, BinaryImage, BoundingRect, Color, ColorName, CompoundPath,
+    CompoundPathElement, PathI32, PointI32,
+};
 
-use crate::{curve::{CurveIntrapolator, CurveIntrapolatorConfig}, debugger::{Debugger, DummyDebugger}, filler::{FilledHoleMatrix, HoleFiller}, geo::bezier_curves_intersection, matcher::Matcher, matcher_helper::{MatchItem, MatchItemSet, Matching}};
+use crate::{
+    curve::{CurveIntrapolator, CurveIntrapolatorConfig},
+    debugger::{Debugger, DummyDebugger},
+    filler::{FilledHoleMatrix, HoleFiller},
+    geo::bezier_curves_intersection,
+    matcher::Matcher,
+    matcher_helper::{MatchItem, MatchItemSet, Matching},
+};
 
 pub struct ShapeCompletor {
     image: BinaryImage,
@@ -21,8 +31,7 @@ impl ShapeCompletor {
         curve_intrapolator_config: CurveIntrapolatorConfig,
         filler_blank_boundary_pixels_tolerance: usize,
         debugger: Option<Box<dyn Debugger>>,
-    ) -> Self
-    {
+    ) -> Self {
         Self {
             image,
             simplify_tolerance,
@@ -64,7 +73,9 @@ impl ShapeCompletor {
                         BoundingRect::new_x_y_w_h(x, y, w + 1, h),     // Expanded to the right
                         BoundingRect::new_x_y_w_h(x, y, w, h + 1),     // Expanded downward
                     ];
-                    for (i, expanded_hole_rect) in IntoIterator::into_iter(expanded_hole_rects).enumerate() {
+                    for (i, expanded_hole_rect) in
+                        IntoIterator::into_iter(expanded_hole_rects).enumerate()
+                    {
                         if 0 <= hole_rect.left
                             && hole_rect.right <= self.image.width as i32
                             && 0 <= hole_rect.top
@@ -141,7 +152,13 @@ impl ShapeCompletor {
             .map(|segment| segment[0])
             .collect();
 
-        HoleFiller::fill(&self.image, hole_rect, intrapolated_curves, endpoints, self.filler_blank_boundary_pixels_tolerance)
+        HoleFiller::fill(
+            &self.image,
+            hole_rect,
+            intrapolated_curves,
+            endpoints,
+            self.filler_blank_boundary_pixels_tolerance,
+        )
     }
 }
 

@@ -8,7 +8,6 @@ use visioncortex::PointF64;
 
 use crate::matcher_helper::{MatchItem, MatchItemSet, Matching, SquareDistanceMatrix};
 
-
 /// Given a set of an even number of 2-D points and direction vectors at those points,
 /// find a complete, disjoint, pair matching of those points such that the sum of distances between the pairs is at minimum.
 pub struct Matcher;

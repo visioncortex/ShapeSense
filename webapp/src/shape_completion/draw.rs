@@ -1,4 +1,7 @@
-use shapecompletion::{debugger::Debugger, filler::{FilledHoleElement, FilledHoleMatrix}};
+use shapecompletion::{
+    debugger::Debugger,
+    filler::{FilledHoleElement, FilledHoleMatrix},
+};
 use wasm_bindgen::prelude::*;
 
 use std::convert::TryInto;

@@ -1,4 +1,4 @@
-use super::{draw::DisplaySelector};
+use super::draw::DisplaySelector;
 use shapecompletion::curve::CurveIntrapolatorConfig;
 use wasm_bindgen::prelude::*;
 
@@ -24,7 +24,7 @@ pub struct ShapeCompletorAPIConfig {
     // Filler
     /// The maximum number of blank pixels outside the hole boundary allowed
     /// for a subregion to still be filled.
-    /// 
+    ///
     /// That is, if, among the pixels outside the hole boundary of a subregion,
     /// `filler_blank_boundary_pixels_tolerance` or less pixels are blank, then
     /// that subregion will be filled.
