@@ -173,8 +173,6 @@ impl HoleFiller {
         offset: PointI32,
         endpoints: Vec<PointI32>,
     ) -> Result<FilledHoleMatrix, String> {
-        let max_depth = std::usize::MAX;
-
         let endpoints = Self::adjust_endpoints(&hole_rect, endpoints);
 
         let bounding_points = hole_rect.get_boundary_points_from(endpoints[0], true);
@@ -261,7 +259,7 @@ impl HoleFiller {
         Ok(matrix)
     }
 
-    // Correction for endpoints off boundary
+    /// Correction for endpoints off boundary
     fn adjust_endpoints(hole_rect: &BoundingRect, endpoints: Vec<PointI32>) -> Vec<PointI32> {
         endpoints
             .into_iter()
@@ -314,39 +312,7 @@ impl HoleFiller {
             .collect()
     }
 
-    fn fill_hole_recursive(matrix: &mut FilledHoleMatrix, point: PointI32, depth: usize) {
-        if depth == 0 {
-            return;
-        }
-        if point.x < 0
-            || point.x >= matrix.width as i32
-            || point.y < 0
-            || point.y >= matrix.height as i32
-        {
-            return;
-        }
-
-        let point_usize = point.to_point_usize();
-
-        if matrix[point_usize] != FilledHoleElement::Blank {
-            return;
-        }
-
-        let four_neighbors = [
-            point + PointI32::new(1, 0),
-            point + PointI32::new(0, 1),
-            point + PointI32::new(-1, 0),
-            point + PointI32::new(0, -1),
-        ];
-
-        matrix[point_usize] = FilledHoleElement::Texture;
-
-        // Flooding to 4-neighbors
-        four_neighbors
-            .iter()
-            .for_each(|&neighbor| Self::fill_hole_recursive(matrix, neighbor, depth - 1));
-    }
-
+    /// Flood fill a region of FilledHoleElement::Blank starting at 'seed' in an iterative manner.
     fn fill_hole_iterative(matrix: &mut FilledHoleMatrix, seed: PointI32) {
         let mut stack = vec![seed];
         while !stack.is_empty() {
