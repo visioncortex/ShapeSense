@@ -162,6 +162,16 @@ impl Hash for Matching {
     }
 }
 
+impl IntoIterator for Matching {
+    type Item = (usize, usize);
+
+    type IntoIter = IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.index_pairs.into_iter()
+    }
+}
+
 impl Matching {
     pub fn new() -> Self {
         Self::default()
@@ -173,10 +183,6 @@ impl Matching {
 
     pub fn iter(&self) -> Iter<(usize, usize)> {
         self.index_pairs.iter()
-    }
-
-    pub fn into_iter(self) -> IntoIter<(usize, usize)> {
-        self.index_pairs.into_iter()
     }
 
     pub fn from_hungarian_result(hungarian_result: Vec<Option<usize>>) -> Self {

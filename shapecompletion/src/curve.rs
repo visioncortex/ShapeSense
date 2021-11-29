@@ -1,6 +1,6 @@
 use visioncortex::{BoundingRect, Color, CompoundPath, PathF64, PointF64, Spline};
 
-use crate::{debugger::Debugger, geo::{LineIntersectionResult, calculate_in_between_point, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, find_corners_open_path, find_new_point_from_4_point_scheme, retract_point}};
+use crate::{debugger::Debugger, geo::{LineIntersectionResult, calculate_intersection, calculate_midpoint, calculate_unit_normal_of_line, find_corners_open_path, find_new_point_from_4_point_scheme, retract_point}};
 
 #[derive(Clone, Copy)]
 pub struct CurveIntrapolatorConfig {
