@@ -18,7 +18,7 @@ bit-vec = "0.6"
 cfg-if = "0.1"
 console_log = { version = "0.2", features = ["color"] }
 shapecompletion = { path = "../shapecompletion" }
-visioncortex = { path = "../visioncortex" }
+visioncortex = "0.7.0"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"]  }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

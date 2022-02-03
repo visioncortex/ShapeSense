@@ -11,4 +11,4 @@ flo_curves = "0.5.1"
 hungarian = "1.1.1"
 log = "0.4"
 permutator = "0.4.0"
-visioncortex = { path = "../visioncortex" }
+visioncortex = "0.7.0"
